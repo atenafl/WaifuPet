@@ -6,7 +6,8 @@
   "author": "atenafl",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win portable"
+    "dist": "electron-builder --win portable",
+    "dist:linux": "electron-builder --linux AppImage"
   },
   "build": {
     "appId": "com.atenafl.waifupet",
@@ -28,7 +29,19 @@
     },
     "portable": {
       "artifactName": "WaifuPet-${version}.exe"
-    }
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "build/icon.png",
+      "category": "Utility",
+      "artifactName": "WaifuPet-${version}.AppImage"
+    },
+    "electronLanguages": [
+      "en-US",
+      "es"
+    ]
   },
   "devDependencies": {
     "electron": "^33.0.0",

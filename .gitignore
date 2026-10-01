@@ -3,3 +3,4 @@ debug.log
 *.log
 dist/*
 !dist/WaifuPet-1.0.0.exe
+!dist/WaifuPet-1.0.0.AppImage

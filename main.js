@@ -3,8 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
 
-const W = 340;
-const H = 380;
+const W = 170;
+const H = 190;
 
 let win = null;
 let paused = false;

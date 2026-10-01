@@ -55,7 +55,7 @@ function setModel(id) {
 const faceY = () => (modelId === 'webillo' ? -192 : HEAD_Y);
 
 const SIZE_IDS = ['small', 'normal', 'big'];
-const SIZE_MUL = { small: 0.78, normal: 1, big: 1.3 };
+const SIZE_MUL = { small: 0.39, normal: 0.5, big: 0.65 };
 const SIZE_NAME = { small: 'Pequeño', normal: 'Normal', big: 'Grande' };
 let sizeId = (() => {
   try {

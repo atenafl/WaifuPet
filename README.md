@@ -6,11 +6,30 @@ Electron + Canvas (sin frameworks).
 
 ## Descargar y ejecutar
 
+### Windows
 1. Descarga **`WaifuPet-1.0.0.exe`** de este repositorio (botón *Code →
    Download ZIP* o el archivo directamente).
 2. Doble clic. No necesita instalación ni Node.js.
 3. La primera vez Windows mostrará **"Windows protegió tu PC"** (el .exe no
    está firmado): pulsa **Más información → Ejecutar de todos modos**.
+
+### Fedora / Linux (AppImage)
+1. Descarga **`WaifuPet-1.0.0.AppImage`** de este repositorio.
+2. Dale permisos de ejecución (el ZIP de GitHub no lo conserva):
+
+   ```bash
+   chmod +x WaifuPet-1.0.0.AppImage
+   ```
+
+   O en Nautilus/GNOME: clic derecho → *Propiedades → Permitir ejecutar
+   como programa*.
+3. Ejecútalo:
+
+   ```bash
+   ./WaifuPet-1.0.0.AppImage
+   ```
+
+   Si avisa de `libfuse.so.2`: `sudo dnf install fuse-libs`
 
 ## Controles
 
@@ -38,13 +57,23 @@ Electron + Canvas (sin frameworks).
 
 ```bash
 npm install
-npm start        # ejecuta en modo desarrollo
-npm run dist     # genera dist/WaifuPet-1.0.0.exe (portable)
+npm start          # ejecuta en modo desarrollo
+npm run dist       # genera dist/WaifuPet-1.0.0.exe (portable, Windows)
+npm run dist:linux # genera dist/WaifuPet-1.0.0.AppImage (Linux)
 ```
 
-Notas de compilación: `electron-builder` necesita extraer symlinks en la
-primera ejecución; en Windows sin privilegios puede fallar. Solución rápida:
-compilar desde una terminal **como administrador**.
+Notas de compilación en Windows: `electron-builder` crea symlinks y Windows
+lo bloquea sin privilegios. Opciones: compilar en una terminal **como
+administrador**, o (como se hizo para este repo) con Docker:
+
+```bash
+docker run --rm -v "${PWD}:/src" node:22-slim bash -c \
+  "apt-get update -qq && apt-get install -y -qq ca-certificates && \
+   update-ca-certificates && mkdir /build && \
+   tar -C /src --exclude=node_modules --exclude=dist --exclude=.git -cf - . | tar -C /build -xf - && \
+   cd /build && npm install && npx electron-builder --linux AppImage && \
+   cp dist/*.AppImage /src/dist/"
+```
 
 ## Estructura
 
