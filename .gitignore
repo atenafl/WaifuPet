@@ -1,4 +1,5 @@
 node_modules/
 debug.log
 *.log
-dist/
+dist/*
+!dist/WaifuPet-1.0.0.exe
