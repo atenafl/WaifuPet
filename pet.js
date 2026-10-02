@@ -31,8 +31,8 @@ const pick = (arr) => arr[(Math.random() * arr.length) | 0];
 
 const api = window.petAPI;
 
-const MODELS = ['waifu', 'webillo'];
-const MODEL_NAME = { waifu: 'Waifu', webillo: 'Webillo' };
+const MODELS = ['waifu', 'webillo', 'saitama'];
+const MODEL_NAME = { waifu: 'Waifu', webillo: 'Webillo', saitama: 'Saitama' };
 let modelId = (() => {
   try {
     localStorage.removeItem('pet.model');
@@ -52,7 +52,7 @@ function setModel(id) {
   say('~ ' + MODEL_NAME[id] + ' ~');
 }
 
-const faceY = () => (modelId === 'webillo' ? -192 : HEAD_Y);
+const faceY = () => (modelId === 'webillo' ? -192 : modelId === 'saitama' ? -230 : HEAD_Y);
 
 const SIZE_IDS = ['small', 'normal', 'big'];
 const SIZE_MUL = { small: 0.78, normal: 1, big: 1.3 };
@@ -108,6 +108,9 @@ let walkT = 0;
 let trailT = 0;
 let winkT = 0;
 let lastHopS = null;
+let punchKind = 'normal';
+let shakeT = 0;
+let comboT = 0;
 
 let blinkClose = 0;
 let blinkT = 2;
@@ -169,7 +172,9 @@ const DUR = {
   spin: [2.6, 3.2],
   clap: [3.5, 5],
   peek: [4, 6],
-  happy: [2.7, 2.7]
+  happy: [2.7, 2.7],
+  punch: [2, 2],
+  shop: [7, 11]
 };
 
 const PH = {
@@ -197,7 +202,11 @@ const PH = {
   peek: ['¿Ahí?', 'No quiero ver~', 'Qué susto...'],
   happy: ['¡Miau! ♡', 'Nya~ ♡', '¡Qué rico!', 'Mmmh~ ♡'],
   surprise: ['¡Ay!', '¡Eek!'],
-  wake: ['¿Mmm?', 'Ya despierta~']
+  wake: ['¿Mmm?', 'Ya despierta~'],
+  punch: ['Puñetazo normal.', 'OK.', 'Uno y ya.'],
+  punchCombo: ['Puñetazos normales consecutivos.'],
+  punchSerious: ['Puñetazo... ¡SERIO!'],
+  shop: ['¡Que se acaba la oferta del súper!', 'Hoy hay puerros baratos', 'No me olvido de la soja', 'Llego antes del descuento']
 };
 
 function enabledDisplays() {
@@ -579,6 +588,13 @@ function setState(s) {
   stateFired = false;
   const d = DUR[s] || DUR.idle;
   dur = rand(d[0], d[1]);
+  if (s === 'punch') {
+    const r = Math.random();
+    punchKind = r < 0.6 ? 'normal' : r < 0.85 ? 'combo' : 'serious';
+    if (punchKind !== 'normal') dur = 2.8;
+    comboT = 0;
+    say(pick(punchKind === 'combo' ? PH.punchCombo : punchKind === 'serious' ? PH.punchSerious : PH.punch));
+  }
 }
 
 function phraseChance(s) {
@@ -587,7 +603,8 @@ function phraseChance(s) {
   if (s === 'walk') return 0.3;
   if (s === 'wave') return 0.85;
   if (s === 'cheer' || s === 'clap') return 0.8;
-  if (s === 'sneeze') return 0;
+  if (s === 'sneeze' || s === 'punch') return 0;
+  if (s === 'shop') return 0.8;
   return 0.5;
 }
 
@@ -620,6 +637,7 @@ function chooseNext() {
     ['clap', 0.05],
     ['peek', 0.04]
   ];
+  if (modelId === 'saitama') table.push(['punch', 0.07], ['shop', 0.08]);
   let total = 0;
   for (const e of table) total += e[1];
   let r = Math.random() * total;
@@ -659,6 +677,11 @@ function doAction(a) {
     case 'sound-off': soundOn = false; break;
     case 'model:waifu': setModel('waifu'); break;
     case 'model:webillo': setModel('webillo'); break;
+    case 'model:saitama': setModel('saitama'); break;
+    case 'punch':
+    case 'shop':
+      if (modelId === 'saitama') setStateSay(a);
+      break;
     case 'size:small': setSize('small'); break;
     case 'size:normal': setSize('normal'); break;
     case 'size:big': setSize('big'); break;
@@ -716,8 +739,44 @@ function meow() {
   o.stop(t + 0.52);
 }
 
+function punchSound(big) {
+  if (!soundOn) return;
+  const a = getAudio();
+  if (!a) return;
+  const t = a.currentTime;
+  const len = big ? 0.9 : 0.45;
+  const buf = a.createBuffer(1, Math.floor(a.sampleRate * len), a.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 2);
+  const noise = a.createBufferSource();
+  noise.buffer = buf;
+  const f = a.createBiquadFilter();
+  f.type = 'lowpass';
+  f.frequency.setValueAtTime(big ? 2600 : 1800, t);
+  f.frequency.exponentialRampToValueAtTime(220, t + len);
+  const g = a.createGain();
+  g.gain.setValueAtTime(big ? 0.5 : 0.32, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+  noise.connect(f);
+  f.connect(g);
+  g.connect(a.destination);
+  noise.start(t);
+  const o = a.createOscillator();
+  const og = a.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(big ? 120 : 160, t);
+  o.frequency.exponentialRampToValueAtTime(40, t + len * 0.8);
+  og.gain.setValueAtTime(big ? 0.45 : 0.3, t);
+  og.gain.exponentialRampToValueAtTime(0.0001, t + len * 0.8);
+  o.connect(og);
+  og.connect(a.destination);
+  o.start(t);
+  o.stop(t + len);
+}
+
 function hit(x, y) {
   if (modelId === 'webillo') return Math.abs(x - W / 2) <= 150 && y >= GROUND - 272 && y <= GROUND;
+  if (modelId === 'saitama') return Math.abs(x - W / 2) <= 42 && y >= GROUND - 256 && y <= GROUND;
   return Math.abs(x - W / 2) <= 76 && y >= GROUND - 246 && y <= GROUND;
 }
 
@@ -1058,6 +1117,7 @@ function spawnSparkles(n) {
 
 // Scene-space position of the lit cigarette tip (model dependent).
 function cigTip() {
+  if (modelId === 'saitama') return { x: 17 * dir, y: -222 };
   return modelId === 'webillo' ? { x: 43, y: -146 } : { x: 10, y: -137 };
 }
 
@@ -1076,6 +1136,70 @@ function spawnSmoke() {
     rot: rand(0, TAU),
     vr: rand(-0.7, 0.7),
     col: '#d3dbd8'
+  });
+}
+
+// Punch effects, emitted from the extended fist (scene x mirrored by dir).
+function fistPoint(dx = 0, dy = 0) {
+  return { x: W / 2 + dir * (SAI_FIST.x + dx), y: GROUND + SAI_FIST.y + dy };
+}
+
+function spawnShock(big) {
+  const f = fistPoint(6);
+  const n = big ? 4 : 2;
+  for (let i = 0; i < n; i++) {
+    parts.push({
+      t: 'shock',
+      x: f.x + dir * i * 14,
+      y: f.y,
+      vx: dir * (big ? 150 : 90),
+      vy: 0,
+      g: 0,
+      life: -i * 0.07,
+      max: big ? 0.75 : 0.5,
+      s: big ? 30 : 18,
+      rot: 0,
+      vr: 0,
+      col: big ? '#fff3b0' : '#ffffff'
+    });
+  }
+}
+
+function spawnStreaks(n, big) {
+  for (let i = 0; i < n; i++) {
+    const f = fistPoint(rand(-30, 10), rand(-26, 26) * (big ? 1.8 : 1));
+    parts.push({
+      t: 'streak',
+      x: f.x,
+      y: f.y,
+      vx: dir * rand(260, 420) * (big ? 1.3 : 1),
+      vy: 0,
+      g: 0,
+      life: 0,
+      max: rand(0.18, 0.32),
+      s: rand(14, 30) * (big ? 1.5 : 1),
+      rot: dir,
+      vr: 0,
+      col: 'rgba(255,255,255,0.95)'
+    });
+  }
+}
+
+function spawnFistGhost() {
+  const f = fistPoint(rand(-14, 6), rand(-22, 22));
+  parts.push({
+    t: 'fist',
+    x: f.x,
+    y: f.y,
+    vx: dir * 40,
+    vy: 0,
+    g: 0,
+    life: 0,
+    max: 0.22,
+    s: rand(6, 8),
+    rot: 0,
+    vr: 0,
+    col: '#c8322b'
   });
 }
 
@@ -1111,6 +1235,7 @@ function heartPath(s) {
 
 function drawParts() {
   for (const p of parts) {
+    if (p.life < 0) continue;
     const raw = 1 - p.life / p.max;
     const a = raw * raw;
     ctx.save();
@@ -1181,6 +1306,33 @@ function drawParts() {
       ctx.quadraticCurveTo(-s * 0.18, -s * 0.18, 0, -s);
       ctx.closePath();
       ctx.fill();
+    } else if (p.t === 'shock') {
+      const k = p.life / p.max;
+      const rr = p.s * (0.4 + k * 1.8);
+      ctx.globalAlpha = (1 - k) * 0.9;
+      ctx.strokeStyle = 'rgba(120,110,160,0.55)';
+      ctx.lineWidth = 6 * (1 - k) + 1;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, rr * 0.38, rr, 0, 0, TAU);
+      ctx.stroke();
+      ctx.strokeStyle = p.col;
+      ctx.lineWidth = 3.5 * (1 - k) + 0.8;
+      ctx.stroke();
+    } else if (p.t === 'streak') {
+      ctx.globalAlpha = raw;
+      ctx.strokeStyle = 'rgba(110,100,150,0.5)';
+      ctx.lineCap = 'round';
+      ctx.lineWidth = 3.4;
+      ctx.beginPath();
+      ctx.moveTo(-p.rot * p.s, 0);
+      ctx.lineTo(0, 0);
+      ctx.stroke();
+      ctx.strokeStyle = p.col;
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+    } else if (p.t === 'fist') {
+      ctx.globalAlpha = raw * 0.75;
+      ell(0, 0, p.s, p.s * 0.9, p.col, 1.4, '#5a1612');
     }
     ctx.restore();
   }
@@ -1237,6 +1389,10 @@ function pose() {
       return { shift: 0, legs: 'stand', arms: 'clap', prop: null, headDY: 0, tilt: 0.02, irisDy: 0, bob: Math.abs(Math.sin(phase)) * 2 };
     case 'peek':
       return { shift: 4, legs: 'stand', arms: 'peek', prop: null, headDY: 3, tilt: 0.06, irisDy: 2, bob: 0 };
+    case 'punch':
+      return { shift: 0, legs: 'stand', arms: 'punch', prop: null, headDY: 0, tilt: 0, irisDy: 0, bob: 0 };
+    case 'shop':
+      return { shift: 0, legs: 'walk', arms: 'bag', prop: null, headDY: 0, tilt: 0.03, irisDy: 0, bob: Math.abs(Math.sin(phase)) * 3 };
     default:
       return { shift: 0, legs: 'stand', arms: 'rest', prop: null, headDY: 0, tilt: 0, irisDy: 0, bob: Math.sin(time * 1.8) * 1.2 };
   }
@@ -1296,6 +1452,34 @@ function update(dt) {
       st += dt;
 
       switch (state) {
+        case 'punch': {
+          const p = st / dur;
+          const hitAt = punchKind === 'serious' ? 0.42 : punchKind === 'combo' ? 0.12 : 0.3;
+          const big = punchKind === 'serious';
+          if (big && p < hitAt) shakeT = Math.max(shakeT, 0.05);
+          if (!stateFired && p >= hitAt) {
+            stateFired = true;
+            spawnShock(big);
+            spawnStreaks(big ? 16 : 6, big);
+            spawnDust(big ? 9 : 4);
+            shakeT = big ? 0.65 : 0.25;
+            punchSound(big);
+            if (big) squash = 0.5;
+          }
+          if (punchKind === 'combo' && p >= hitAt && p < 0.8) {
+            phase += dt * 26;
+            comboT -= dt;
+            if (comboT <= 0) {
+              spawnFistGhost();
+              spawnFistGhost();
+              spawnStreaks(1);
+              shakeT = Math.max(shakeT, 0.06);
+              comboT = 0.045;
+            }
+          }
+          break;
+        }
+        case 'shop':
         case 'walk': {
           phase += dt * 7.5;
           pos.x += dir * 62 * dt;
@@ -1451,9 +1635,10 @@ function update(dt) {
     }
 
     squash = Math.max(0, squash - dt * 4.5);
+    shakeT = Math.max(0, shakeT - dt);
   }
 
-  if (mouse.in && state !== 'sleep' && state !== 'walk') {
+  if (mouse.in && state !== 'sleep' && state !== 'walk' && state !== 'shop' && state !== 'punch') {
     dir = mouse.x >= W / 2 ? 1 : -1;
   }
 
@@ -2170,7 +2355,9 @@ function drawProp(prop, t) {
     // Held between the fingers, lit end pointing up towards the mouth.
     const g = modelId === 'webillo'
       ? { x: 58, y: -90, rot: -1.7, len: 20 }   // + drawWebilloProp offset => scene (46, -126)
-      : { x: 34, y: -134, rot: -3, len: 24 };
+      : modelId === 'saitama'
+        ? { x: 2, y: -163, rot: -0.27, len: 14 } // + drawSaitamaProp offset => scene (2, -218)
+        : { x: 34, y: -134, rot: -3, len: 24 };
     ctx.save();
     ctx.translate(g.x, g.y);
     ctx.rotate(g.rot);
@@ -2301,6 +2488,10 @@ function drawScene(dt) {
   if (state === 'shiver' && !drag) {
     ctx.translate(Math.sin(time * 62) * 2.6, Math.sin(time * 47) * 1.3);
   }
+  if (shakeT > 0 && !drag) {
+    const k = Math.min(1, shakeT * 4) * (punchKind === 'serious' ? 4 : 2);
+    ctx.translate(Math.sin(time * 91) * k, Math.sin(time * 73) * k * 0.6);
+  }
   if (state === 'spin' && !drag) {
     ctx.translate(0, -110);
     ctx.rotate((st / dur) * TAU);
@@ -2309,6 +2500,8 @@ function drawScene(dt) {
 
   if (modelId === 'webillo') {
     drawWebillo(time, pz);
+  } else if (modelId === 'saitama') {
+    drawSaitama(time, pz);
   } else {
     drawTail(time);
     drawBackHair();
@@ -3047,6 +3240,399 @@ function drawWebillo(t, pz) {
   drawWebilloEyes(t);
   drawWebilloBrows();
   drawWebilloMouth();
+}
+
+// ---------- saitama model ----------
+
+// assets/saitama.png is the cut-out body (no cape, no arms). Image pixels map
+// to scene units with SAI.k, origin (ox, oy) between the boots on the floor.
+const SAI = { k: 0.41, ox: 62, oy: 614 };
+const SAI_FIST = { x: 104, y: -189 };
+const SAI_SHOULDER = 21;
+const SAI_SEG = 42;
+const SCOL = {
+  suit: '#efc75e',
+  glove: '#b8382b',
+  gloveLight: '#d4574a',
+  line: '#3a281c',
+  gloveLine: '#4a1a12',
+  skin: '#dfb99f',
+  cape: '#f6f6f8',
+  capeShade: '#d8d8e2',
+  capeLine: '#55566a'
+};
+const SAI_RECTS = {
+  head: [0, 0, 156, 100],
+  body: [0, 100, 156, 239],
+  legL: [0, 304, 62, 310],
+  legR: [62, 304, 94, 310]
+};
+const SAI_PIVOT = { head: [59, 100], legL: [38, 319], legR: [86, 319] };
+
+let sImg = null;
+let sLay = null;
+
+(function sLoad() {
+  sImg = new Image();
+  sImg.onload = () => {
+    sLay = {};
+    for (const k in SAI_RECTS) {
+      const r = SAI_RECTS[k];
+      const c = document.createElement('canvas');
+      c.width = sImg.naturalWidth;
+      c.height = sImg.naturalHeight;
+      const g = c.getContext('2d');
+      g.beginPath();
+      g.rect(r[0], r[1], r[2], r[3]);
+      g.clip();
+      g.drawImage(sImg, 0, 0);
+      sLay[k] = c;
+    }
+  };
+  sImg.onerror = function () {
+    sLay = null;
+    console.error('saitama: no se pudo cargar assets/saitama.png');
+  };
+  sImg.src = 'assets/saitama.png';
+})();
+
+function saiPut(name, rot, sy) {
+  const pv = SAI_PIVOT[name];
+  ctx.save();
+  ctx.scale(SAI.k, SAI.k);
+  ctx.translate(-SAI.ox, -SAI.oy);
+  if (pv && (rot || sy)) {
+    ctx.translate(pv[0], pv[1]);
+    if (rot) ctx.rotate(rot);
+    if (sy) ctx.scale(1, sy);
+    ctx.translate(-pv[0], -pv[1]);
+  }
+  ctx.drawImage(sLay[name], 0, 0);
+  ctx.restore();
+}
+
+const lerp = (a, b, k) => a + (b - a) * k;
+const lerpP = (p, q, k) => ({ x: lerp(p.x, q.x, k), y: lerp(p.y, q.y, k) });
+const ease = (k) => k * k * (3 - 2 * k);
+
+function saiPunchHands(t) {
+  const p = st / dur;
+  const restL = { x: -26, y: -106 };
+  const restR = { x: 26, y: -106 };
+  const guardL = { x: -2, y: -180 };
+  const cocked = { x: 6, y: -172 };
+  const out = { x: SAI_FIST.x, y: SAI_FIST.y };
+  if (punchKind === 'combo') {
+    if (p < 0.12) {
+      const k = ease(p / 0.12);
+      return [lerpP(restL, guardL, k), lerpP(restR, cocked, k)];
+    }
+    if (p < 0.8) {
+      const s = Math.sin(phase);
+      const jit = Math.sin(t * 57) * 6;
+      const outL = { x: out.x - 30, y: out.y + 6 + jit };
+      const outR = { x: out.x, y: out.y - jit };
+      return s > 0 ? [guardL, outR] : [outL, cocked];
+    }
+    const k = ease(clamp((p - 0.8) / 0.15, 0, 1));
+    return [lerpP(guardL, restL, k), lerpP(cocked, restR, k)];
+  }
+  const hitAt = punchKind === 'serious' ? 0.42 : 0.3;
+  if (p < hitAt) {
+    const k = ease(clamp(p / (hitAt * 0.7), 0, 1));
+    const tremble = punchKind === 'serious' ? Math.sin(t * 70) * 1.5 * k : 0;
+    return [lerpP(restL, guardL, k), { x: lerp(restR.x, cocked.x, k) + tremble, y: lerp(restR.y, cocked.y, k) }];
+  }
+  if (p < hitAt + 0.04) {
+    const k = (p - hitAt) / 0.04;
+    return [guardL, lerpP(cocked, out, k)];
+  }
+  if (p < 0.72) return [guardL, out];
+  const k = ease(clamp((p - 0.72) / 0.18, 0, 1));
+  return [lerpP(guardL, restL, k), lerpP(out, restR, k)];
+}
+
+function saiHands(pz, t) {
+  const sw = Math.sin(phase);
+  const b = Math.sin(t * 1.8) * 1.2;
+  const rest = [{ x: -26, y: -106 + b }, { x: 26, y: -106 - b }];
+  switch (pz.arms) {
+    case 'swing':
+      return [{ x: -24 + sw * 7, y: -107 }, { x: 24 - sw * 7, y: -107 }];
+    case 'bag':
+      return [{ x: -27, y: -108 }, { x: 24 - sw * 7, y: -107 }];
+    case 'up': {
+      const w = Math.sin(t * 7) * 3;
+      return [{ x: -24, y: -262 - w }, { x: 24, y: -262 + w }];
+    }
+    case 'dance': {
+      const up = sw > 0;
+      return [{ x: -26, y: up ? -258 : -108 }, { x: 26, y: up ? -108 : -258 }];
+    }
+    case 'cheer': {
+      const up = Math.sin(t * 8) > 0;
+      return [{ x: -28, y: up ? -260 : -110 }, { x: 28, y: up ? -110 : -260 }];
+    }
+    case 'face':
+      return [rest[0], { x: 10, y: -212 }];
+    case 'wave':
+      return [rest[0], { x: 40 + Math.sin(t * 11) * 6, y: -250 + Math.cos(t * 11) * 7 }];
+    case 'cross':
+      return [{ x: 12, y: -165 }, { x: -12, y: -158 }];
+    case 'clap': {
+      const o = Math.sin(phase) * 3;
+      return [{ x: -3 + o, y: -168 }, { x: 3 + o, y: -168 }];
+    }
+    case 'peek': {
+      const ey = -228 + (pz.headDY || 0) * 0.35;
+      return [{ x: -9, y: ey }, { x: 5, y: ey }];
+    }
+    case 'curl':
+      return [{ x: -14, y: -138 }, { x: 14, y: -138 }];
+    case 'hold':
+      if (pz.prop === 'cup') return [rest[0], { x: 28, y: -159 }];
+      if (pz.prop === 'phone') return [rest[0], { x: 26, y: -161 }];
+      return [{ x: 6, y: -147 }, { x: 27, y: -149 }];
+    case 'punch':
+      return saiPunchHands(t);
+    default:
+      return rest;
+  }
+}
+
+// Two-bone IK with the elbow bent away from the body's centre line.
+function saiElbow(s, h, side) {
+  let dx = h.x - s.x;
+  let dy = h.y - s.y;
+  let d = Math.hypot(dx, dy) || 1;
+  const max = SAI_SEG * 2 - 0.5;
+  if (d > max) {
+    h = { x: s.x + (dx / d) * max, y: s.y + (dy / d) * max };
+    dx = h.x - s.x;
+    dy = h.y - s.y;
+    d = max;
+  }
+  const off = Math.sqrt(Math.max(0, SAI_SEG * SAI_SEG - (d / 2) * (d / 2)));
+  const mx = (s.x + h.x) / 2;
+  const my = (s.y + h.y) / 2;
+  let px = -dy / d;
+  let py = dx / d;
+  if (px * side < 0 || (Math.abs(px) < 0.2 && py < 0)) {
+    px = -px;
+    py = -py;
+  }
+  return { e: { x: mx + px * off, y: my + py * off }, h };
+}
+
+function saiArm(side, hand) {
+  const s = { x: SAI_SHOULDER * side, y: -189 };
+  const r = saiElbow(s, hand, side);
+  const e = r.e;
+  const h = r.h;
+  limb(s.x, s.y, e.x, e.y, (s.x + e.x) / 2, (s.y + e.y) / 2, SCOL.suit, 12.5, 10, SCOL.line);
+  const cx = lerp(e.x, h.x, 0.32);
+  const cy = lerp(e.y, h.y, 0.32);
+  limb(cx, cy, h.x, h.y, (cx + h.x) / 2, (cy + h.y) / 2, SCOL.glove, 12.5, 10, SCOL.gloveLine);
+  limb(e.x, e.y, cx, cy, (e.x + cx) / 2, (e.y + cy) / 2, SCOL.glove, 16.5, 14, SCOL.gloveLine);
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  ctx.rotate(Math.atan2(h.y - e.y, h.x - e.x));
+  ell(1.5, 0, 7, 6.4, SCOL.glove, 1.6, SCOL.gloveLine);
+  ctx.beginPath();
+  ctx.moveTo(4, -4);
+  ctx.quadraticCurveTo(7, 0, 4, 4);
+  ctx.strokeStyle = SCOL.gloveLine;
+  ctx.lineWidth = 1.1;
+  ctx.stroke();
+  ell(-1, -2.5, 2.4, 1.4, SCOL.gloveLight, 0);
+  ctx.restore();
+  return h;
+}
+
+function drawSaitamaCape(t, pz) {
+  const moving = pz.legs === 'walk' || drag;
+  let drift = moving ? 16 : 0;
+  if (state === 'punch' && !drag) {
+    const p = st / dur;
+    const hitAt = punchKind === 'serious' ? 0.42 : punchKind === 'combo' ? 0.12 : 0.3;
+    if (p >= hitAt && p < 0.85) drift = punchKind === 'serious' ? 40 : 26;
+  }
+  const fl = Math.sin(t * (moving ? 9 : 3)) * (moving ? 4 : 1.6);
+  const fl2 = Math.sin(t * (moving ? 9 : 3) + 1.3) * (moving ? 5 : 2);
+  const bottom = -46;
+  ctx.beginPath();
+  ctx.moveTo(-20, -198);
+  ctx.quadraticCurveTo(-34, -150, -46 - drift * 0.6 + fl, bottom);
+  ctx.quadraticCurveTo(-24 - drift, bottom + 6 + fl2, -2 - drift, bottom - 2);
+  ctx.quadraticCurveTo(20 - drift, bottom + 6 - fl2, 46 - drift * 1.4 - fl, bottom);
+  ctx.quadraticCurveTo(34, -150, 20, -198);
+  ctx.closePath();
+  const g = ctx.createLinearGradient(-40, -200, 30, bottom);
+  g.addColorStop(0, SCOL.cape);
+  g.addColorStop(1, SCOL.capeShade);
+  fillStroke(g, 1.6, SCOL.capeLine);
+  ctx.beginPath();
+  ctx.moveTo(-20, -194);
+  ctx.quadraticCurveTo(-18, -214, 0, -216);
+  ctx.quadraticCurveTo(18, -214, 20, -194);
+  ctx.closePath();
+  fillStroke(SCOL.cape, 1.4, SCOL.capeLine);
+}
+
+function drawSaitamaPads() {
+  for (const s of [-1, 1]) {
+    ctx.save();
+    ctx.translate(17 * s, -195);
+    ctx.rotate(0.3 * s);
+    ctx.beginPath();
+    ctx.moveTo(-10, 2);
+    ctx.quadraticCurveTo(-11, -6, 0, -6.5);
+    ctx.quadraticCurveTo(11, -6, 10, 2);
+    ctx.quadraticCurveTo(0, 6, -10, 2);
+    ctx.closePath();
+    fillStroke(SCOL.cape, 1.3, SCOL.capeLine);
+    ell(0, -0.5, 3.4, 3.2, '#4c4c55', 1, '#26262c');
+    ell(-1, -1.6, 1.1, 0.9, '#9a9aa6', 0);
+    ctx.restore();
+  }
+}
+
+function drawSaitamaBag(hand, t) {
+  ctx.save();
+  ctx.translate(hand.x, hand.y);
+  ctx.rotate(Math.sin(phase + 0.6) * 0.22);
+  ctx.save();
+  ctx.translate(5, 16);
+  ctx.rotate(0.38);
+  rrect(-2.4, -34, 4.8, 30, 2, '#f4f8e8', 1.1, '#7d8a63');
+  ctx.fillStyle = '#9ec86a';
+  ctx.fillRect(-2.4, -26, 4.8, 8);
+  for (const a of [-0.35, 0, 0.32]) {
+    ctx.save();
+    ctx.translate(0, -33);
+    ctx.rotate(a);
+    rrect(-1.8, -14, 3.6, 15, 1.6, '#4f9a3a', 1, '#2f6324');
+    ctx.restore();
+  }
+  ctx.restore();
+  ell(-6, 13, 4.2, 4, '#e2483a', 1, '#8a2a20');
+  ctx.beginPath();
+  ctx.moveTo(-4, 0);
+  ctx.quadraticCurveTo(-10, 4, -10, 10);
+  ctx.moveTo(4, 0);
+  ctx.quadraticCurveTo(10, 4, 10, 10);
+  ctx.strokeStyle = SCOL.capeLine;
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-12, 9);
+  ctx.lineTo(12, 9);
+  ctx.quadraticCurveTo(16, 26, 14, 40);
+  ctx.quadraticCurveTo(0, 45, -14, 40);
+  ctx.quadraticCurveTo(-16, 26, -12, 9);
+  ctx.closePath();
+  fillStroke('rgba(250,250,246,0.97)', 1.5, SCOL.capeLine);
+  ctx.strokeStyle = 'rgba(85,86,106,0.35)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-5, 14);
+  ctx.quadraticCurveTo(-7, 26, -4, 38);
+  ctx.moveTo(6, 14);
+  ctx.quadraticCurveTo(8, 25, 5, 37);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawSaitamaFace(t) {
+  const mode = eyeMode();
+  const amt = mode === 'sleep' || mode === 'happy' ? 1 : blinkAmt;
+  if (amt > 0.02) {
+    for (const e of [[41.5, 55.5, 9, 5], [70.5, 52.5, 8, 4.5]]) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(e[0], e[1], e[2] + 1.5, e[3] + 1.5, 0, 0, TAU);
+      ctx.clip();
+      const top = e[1] - e[3] - 2;
+      const h = (e[3] * 2 + 4) * amt;
+      ctx.fillStyle = SCOL.skin;
+      ctx.fillRect(e[0] - e[2] - 2, top, e[2] * 2 + 4, h);
+      ctx.restore();
+      ctx.beginPath();
+      if (mode === 'happy') {
+        ctx.moveTo(e[0] - e[2], e[1] + 1);
+        ctx.quadraticCurveTo(e[0], e[1] - e[3] - 2, e[0] + e[2], e[1] + 1);
+      } else {
+        const y = top + h;
+        ctx.moveTo(e[0] - e[2], y);
+        ctx.quadraticCurveTo(e[0], y + 1.5 * amt, e[0] + e[2], y);
+      }
+      ctx.strokeStyle = SCOL.line;
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    }
+  }
+  let m = mouthMode();
+  if (state === 'punch') m = punchKind === 'normal' ? null : 'shout';
+  const sz = { open: [4, 3], yawn: [5, 7.5], shout: [6.5, 5.5], chatter: [3.5, 1.5 + Math.abs(Math.sin(t * 30)) * 1.5], o: [3, 3] }[m];
+  if (sz) {
+    ell(59, 80, sz[0] + 1.5, sz[1] + 1.5, SCOL.skin, 0);
+    ell(59, 80, sz[0], sz[1], '#5b2a22', 1.4, SCOL.line);
+    ell(59, 80 + sz[1] * 0.45, sz[0] * 0.6, sz[1] * 0.35, '#c4625a', 0);
+  }
+}
+
+function drawSaitamaProp(prop, t) {
+  if (!prop) return;
+  ctx.save();
+  ctx.translate(0, -55);
+  drawProp(prop, t);
+  ctx.restore();
+}
+
+function drawSaitama(t, pz) {
+  if (!sLay) return;
+  headYCanvas = GROUND + pz.shift - pz.bob - 178;
+  const hands = saiHands(pz, t);
+
+  drawSaitamaCape(t, pz);
+
+  const legs = pz.legs;
+  let legL = 0;
+  let legR = 0;
+  let sy = 0;
+  if (legs === 'walk' || legs === 'dance') {
+    const a = legs === 'dance' ? 0.26 : 0.2;
+    legL = Math.sin(phase) * a;
+    legR = -Math.sin(phase) * a;
+  } else if (legs === 'dangle') {
+    legL = Math.sin(t * 2.2) * 0.12;
+    legR = -Math.sin(t * 2.2) * 0.12;
+  } else if (legs === 'sit' || legs === 'curl') {
+    sy = (121 - pz.shift) / 121;
+    legL = 0.16;
+    legR = -0.16;
+  }
+  saiPut('legL', legL, sy);
+  saiPut('legR', legR, sy);
+  saiPut('body');
+
+  const pv = SAI_PIVOT.head;
+  ctx.save();
+  ctx.scale(SAI.k, SAI.k);
+  ctx.translate(-SAI.ox, -SAI.oy + (pz.headDY || 0) * 0.35 / SAI.k);
+  ctx.translate(pv[0], pv[1]);
+  ctx.rotate((pz.tilt || 0) * 0.6);
+  ctx.translate(-pv[0], -pv[1]);
+  ctx.drawImage(sLay.head, 0, 0);
+  drawSaitamaFace(t);
+  ctx.restore();
+
+  if (pz.arms === 'bag' && !drag) drawSaitamaBag(saiElbow({ x: -SAI_SHOULDER, y: -189 }, hands[0], -1).h, t);
+  saiArm(-1, hands[0]);
+  saiArm(1, hands[1]);
+  drawSaitamaPads();
+  if (pz.prop && !drag) drawSaitamaProp(pz.prop, t);
 }
 
 // ---------- boot ----------

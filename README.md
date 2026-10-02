@@ -26,7 +26,10 @@ Electron + Canvas (sin frameworks).
 - **Multipantalla real**: tamaño visual constante (en cm) en todos los
   monitores vía corrección EDID, transición gradual al cruzar de pantalla,
   sin saltos ni vibración; el suelo se adapta a cada monitor.
-- **Dos modelos**: waifu (canvas vectorial) y webillo (pixel art).
+- **Tres modelos**: waifu (canvas vectorial), webillo (pixel art) y Saitama
+  (sprite recortado con brazos y capa en canvas). Saitama además da
+  puñetazos (normal, consecutivos y serio, con onda de choque) y va a la
+  compra con su bolsa.
 - **Animaciones**: paseo, baile, sueño, café, lectura, teléfono, cigarrillo,
   desayuno, canto, videojuego, estirarse, saludar, bostezar, tiritar,
   estornudar, animarse con confeti, saltos de conejo, girar, aplaudir,
@@ -52,3 +55,4 @@ compilar desde una terminal **como administrador**.
 - `pet.js` — todo el motor de la mascota (física, estados, animaciones, dibujo)
 - `preload.js` — puente IPC
 - `assets/webillo.png` — sprite de webillo e icono de la app
+- `assets/saitama.png` — sprite de Saitama (sin capa ni brazos)

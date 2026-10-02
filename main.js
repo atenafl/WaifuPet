@@ -12,10 +12,11 @@ let sound = true;
 let model = 'waifu';
 let sizeId = 'normal';
 const SIZES = ['small', 'normal', 'big'];
+const MODELS = ['waifu', 'webillo', 'saitama'];
 let disabled = new Set();
 
 function setModel(m) {
-  if (m !== 'waifu' && m !== 'webillo') return;
+  if (MODELS.indexOf(m) < 0) return;
   model = m;
   send('model:' + m);
 }
@@ -189,6 +190,12 @@ function showMenu() {
         { label: 'Girar sobre sí misma', click: () => send('spin') },
         { label: 'Aplaudir', click: () => send('clap') },
         { label: 'Taparse los ojos', click: () => send('peek') },
+        ...(model === 'saitama'
+          ? [
+              { label: 'Dar un puñetazo', click: () => send('punch') },
+              { label: 'Ir a la compra', click: () => send('shop') }
+            ]
+          : []),
         { label: 'Despertar', click: () => send('wake') }
       ]
     },
@@ -197,7 +204,8 @@ function showMenu() {
       label: 'Modelo',
       submenu: [
         { label: 'Waifu', type: 'radio', checked: model === 'waifu', click: () => setModel('waifu') },
-        { label: 'Webillo', type: 'radio', checked: model === 'webillo', click: () => setModel('webillo') }
+        { label: 'Webillo', type: 'radio', checked: model === 'webillo', click: () => setModel('webillo') },
+        { label: 'Saitama', type: 'radio', checked: model === 'saitama', click: () => setModel('saitama') }
       ]
     },
     {
@@ -297,7 +305,7 @@ ipcMain.handle('pet-info', async () => {
 ipcMain.on('pet-menu', showMenu);
 
 ipcMain.on('pet-model', (_e, m) => {
-  if (m === 'waifu' || m === 'webillo') model = m;
+  if (MODELS.indexOf(m) >= 0) model = m;
 });
 
 ipcMain.on('pet-sizemul', (_e, id) => {
