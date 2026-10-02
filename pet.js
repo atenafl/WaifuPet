@@ -31,12 +31,12 @@ const pick = (arr) => arr[(Math.random() * arr.length) | 0];
 
 const api = window.petAPI;
 
-const MODELS = ['waifu', 'webillo', 'saitama'];
-const MODEL_NAME = { waifu: 'Waifu', webillo: 'Webillo', saitama: 'Saitama' };
+const MODELS = ['waifu', 'webillo', 'saitama', 'dragonball'];
+const MODEL_NAME = { waifu: 'Waifu', webillo: 'Webillo', saitama: 'Saitama', dragonball: 'Goku y Vegeta' };
 let modelId = (() => {
   try {
-    localStorage.removeItem('pet.model');
-    return 'webillo';
+    const saved = localStorage.getItem('pet.model');
+    return MODELS.includes(saved) ? saved : 'webillo';
   } catch (e) {
     return 'webillo';
   }
@@ -44,7 +44,14 @@ let modelId = (() => {
 
 function setModel(id) {
   if (MODELS.indexOf(id) < 0 || id === modelId) return;
+  if (encounter) encounter = false;
+  if (punchBig && api.fx) api.fx('end', {});
+  punchBig = false;
   modelId = id;
+  setState('idle');
+  air = false;
+  vy = 0;
+  syncGeometry();
   try {
     localStorage.setItem('pet.model', id);
   } catch (e) {}
@@ -161,6 +168,12 @@ let zzzT = 0;
 let smokeT = 0;
 let look = { x: 0, y: 0 };
 let time = 0;
+let encounter = false;
+let encounterHitStop = 0;
+let heroReportT = 0;
+let capeWind = 0;
+let previousPos = { x: 0, y: 0 };
+const physicalCape = window.HeroArt.capeState();
 let over = false;
 let headYCanvas = GROUND + HEAD_Y;
 
@@ -676,6 +689,7 @@ function setStateSay(s) {
 }
 
 function chooseNext() {
+  if (encounter) { setState('idle'); return; }
   const table = [
     ['idle', 0.13],
     ['walk', 0.17],
@@ -731,6 +745,23 @@ function jump() {
 }
 
 function doAction(a) {
+  if (a.startsWith('battle-sound:')) { punchSound(a.endsWith('blast')); return; }
+  if (a.startsWith('encounter-start:') && modelId === 'saitama') {
+    encounter = true;
+    setState('idle');
+    dir = Number(a.split(':')[1]);
+    say('¿Otra vez? Bueno...');
+    return;
+  }
+  if (a.startsWith('encounter-punch:') && modelId === 'saitama' && encounter) {
+    dir = Number(a.split(':')[1]);
+    setState('punch');
+    punchKind = 'normal';
+    dur = 1.35;
+    say('Un golpe.');
+    return;
+  }
+  if (a === 'encounter-end') { encounter = false; return; }
   switch (a) {
     case 'pet': pet(); break;
     case 'pause-on': paused = true; break;
@@ -740,6 +771,7 @@ function doAction(a) {
     case 'model:waifu': setModel('waifu'); break;
     case 'model:webillo': setModel('webillo'); break;
     case 'model:saitama': setModel('saitama'); break;
+    case 'model:dragonball': setModel('dragonball'); break;
     case 'punch':
     case 'shop':
       if (modelId === 'saitama') setStateSay(a);
@@ -1546,8 +1578,9 @@ function pose() {
 }
 
 function update(dt) {
-  time += dt;
-  if (!ready) return;
+  if (!paused && encounterHitStop > 0) { encounterHitStop = Math.max(0, encounterHitStop - dt); return; }
+  if (!paused) time += dt;
+  if (!ready || modelId === 'dragonball') return;
   computeLayout();
   refreshWA();
   const dc = pickDisplay();
@@ -1633,6 +1666,7 @@ function update(dt) {
             shakeT = heavy ? 1.1 : 0.3;
             shakeAmp = punchBig ? (serious ? 16 : 11) : serious ? 5 : 2.5;
             punchSound(heavy);
+            if (encounter && api.monsterHit) { api.monsterHit(); encounterHitStop = .075; }
             squash = heavy ? 0.55 : 0.2;
             if (punchBig && api.fx) api.fx('impact', { kind: punchKind, dir, fist: fistGlobal() });
           }
@@ -1818,7 +1852,7 @@ function update(dt) {
     impactT = Math.max(0, impactT - dt);
   }
 
-  if (mouse.in && state !== 'sleep' && state !== 'walk' && state !== 'shop' && state !== 'punch') {
+  if (!encounter && mouse.in && state !== 'sleep' && state !== 'walk' && state !== 'shop' && state !== 'punch') {
     dir = mouse.x >= W / 2 ? 1 : -1;
   }
 
@@ -1855,6 +1889,22 @@ function update(dt) {
   }
   computeLayout();
   applyMove();
+  if (modelId === 'saitama') {
+    if (!paused) {
+      const speed = (pos.x - previousPos.x) / Math.max(dt, .001);
+      const falling = (pos.y - previousPos.y) / Math.max(dt, .001);
+      const ph = state === 'punch' ? saiPunchPhase() : null;
+      const wind = clamp(-speed * dir * .18 + falling * .025 - (ph ? ph.hold * 48 + ph.charge * 22 : 0), -65, 65);
+      capeWind += (wind - capeWind) * Math.min(1, dt * 7);
+      window.HeroArt.stepCape(physicalCape, dt, capeWind, time);
+    }
+    previousPos = { ...pos };
+    heroReportT -= dt;
+    if (heroReportT <= 0 && api.hero) {
+      api.hero({ x: pos.x + W / 2 * F(), ground: pos.y + GROUND * Fh(), scale: Fh(), dir, state, drag: !!drag, air });
+      heroReportT = .1;
+    }
+  }
 }
 
 // ---------- drawing helpers ----------
@@ -3446,72 +3496,10 @@ function drawWebillo(t, pz) {
 
 // ---------- saitama model ----------
 
-// assets/saitama.png is the cut-out body (no cape, no arms). Image pixels map
-// to scene units with SAI.k, origin (ox, oy) between the boots on the floor.
-const SAI = { k: 0.41, ox: 62, oy: 614 };
-const SAI_FIST = { x: 104, y: -189 };
+const SAI_FIST = window.AnimationGeometry.saitama;
 const SAI_SHOULDER = 21;
 const SAI_SEG = 42;
-const SCOL = {
-  suit: '#efc75e',
-  glove: '#b8382b',
-  gloveLight: '#d4574a',
-  line: '#3a281c',
-  gloveLine: '#4a1a12',
-  skin: '#dfb99f',
-  cape: '#f6f6f8',
-  capeShade: '#d8d8e2',
-  capeLine: '#55566a'
-};
-const SAI_RECTS = {
-  head: [0, 0, 156, 100],
-  body: [0, 100, 156, 239],
-  legL: [0, 304, 62, 310],
-  legR: [62, 304, 94, 310]
-};
-const SAI_PIVOT = { head: [59, 100], legL: [38, 319], legR: [86, 319] };
-
-let sImg = null;
-let sLay = null;
-
-(function sLoad() {
-  sImg = new Image();
-  sImg.onload = () => {
-    sLay = {};
-    for (const k in SAI_RECTS) {
-      const r = SAI_RECTS[k];
-      const c = document.createElement('canvas');
-      c.width = sImg.naturalWidth;
-      c.height = sImg.naturalHeight;
-      const g = c.getContext('2d');
-      g.beginPath();
-      g.rect(r[0], r[1], r[2], r[3]);
-      g.clip();
-      g.drawImage(sImg, 0, 0);
-      sLay[k] = c;
-    }
-  };
-  sImg.onerror = function () {
-    sLay = null;
-    console.error('saitama: no se pudo cargar assets/saitama.png');
-  };
-  sImg.src = 'assets/saitama.png';
-})();
-
-function saiPut(name, rot, sy) {
-  const pv = SAI_PIVOT[name];
-  ctx.save();
-  ctx.scale(SAI.k, SAI.k);
-  ctx.translate(-SAI.ox, -SAI.oy);
-  if (pv && (rot || sy)) {
-    ctx.translate(pv[0], pv[1]);
-    if (rot) ctx.rotate(rot);
-    if (sy) ctx.scale(1, sy);
-    ctx.translate(-pv[0], -pv[1]);
-  }
-  ctx.drawImage(sLay[name], 0, 0);
-  ctx.restore();
-}
+const SCOL = { capeLine: '#55566a' };
 
 const lerp = (a, b, k) => a + (b - a) * k;
 const lerpP = (p, q, k) => ({ x: lerp(p.x, q.x, k), y: lerp(p.y, q.y, k) });
@@ -3638,77 +3626,6 @@ function saiElbow(s, h, side) {
   return { e: { x: mx + px * off, y: my + py * off }, h };
 }
 
-function saiArm(side, hand) {
-  const s = { x: SAI_SHOULDER * side, y: -189 };
-  const r = saiElbow(s, hand, side);
-  const e = r.e;
-  const h = r.h;
-  limb(s.x, s.y, e.x, e.y, (s.x + e.x) / 2, (s.y + e.y) / 2, SCOL.suit, 12.5, 10, SCOL.line);
-  const cx = lerp(e.x, h.x, 0.32);
-  const cy = lerp(e.y, h.y, 0.32);
-  limb(cx, cy, h.x, h.y, (cx + h.x) / 2, (cy + h.y) / 2, SCOL.glove, 12.5, 10, SCOL.gloveLine);
-  limb(e.x, e.y, cx, cy, (e.x + cx) / 2, (e.y + cy) / 2, SCOL.glove, 16.5, 14, SCOL.gloveLine);
-  ctx.save();
-  ctx.translate(h.x, h.y);
-  ctx.rotate(Math.atan2(h.y - e.y, h.x - e.x));
-  ell(1.5, 0, 7, 6.4, SCOL.glove, 1.6, SCOL.gloveLine);
-  ctx.beginPath();
-  ctx.moveTo(4, -4);
-  ctx.quadraticCurveTo(7, 0, 4, 4);
-  ctx.strokeStyle = SCOL.gloveLine;
-  ctx.lineWidth = 1.1;
-  ctx.stroke();
-  ell(-1, -2.5, 2.4, 1.4, SCOL.gloveLight, 0);
-  ctx.restore();
-  return h;
-}
-
-function drawSaitamaCape(t, pz) {
-  const ph = state === 'punch' && !drag ? saiPunchPhase() : null;
-  const moving = pz.legs === 'walk' || drag || (ph && (ph.charge > 0.2 || ph.hold > 0));
-  let drift = moving ? 16 : 0;
-  if (ph && ph.charge > 0) drift = 10 + ph.charge * (punchKind === 'serious' || punchBig ? 22 : 10);
-  if (ph && ph.hold > 0) drift = punchKind === 'serious' || punchBig ? 48 : 28;
-  const fl = Math.sin(t * (moving ? 9 : 3)) * (moving ? 4 : 1.6);
-  const fl2 = Math.sin(t * (moving ? 9 : 3) + 1.3) * (moving ? 5 : 2);
-  const bottom = -46;
-  ctx.beginPath();
-  ctx.moveTo(-20, -198);
-  ctx.quadraticCurveTo(-34, -150, -46 - drift * 0.6 + fl, bottom);
-  ctx.quadraticCurveTo(-24 - drift, bottom + 6 + fl2, -2 - drift, bottom - 2);
-  ctx.quadraticCurveTo(20 - drift, bottom + 6 - fl2, 46 - drift * 1.4 - fl, bottom);
-  ctx.quadraticCurveTo(34, -150, 20, -198);
-  ctx.closePath();
-  const g = ctx.createLinearGradient(-40, -200, 30, bottom);
-  g.addColorStop(0, SCOL.cape);
-  g.addColorStop(1, SCOL.capeShade);
-  fillStroke(g, 1.6, SCOL.capeLine);
-  ctx.beginPath();
-  ctx.moveTo(-20, -194);
-  ctx.quadraticCurveTo(-18, -214, 0, -216);
-  ctx.quadraticCurveTo(18, -214, 20, -194);
-  ctx.closePath();
-  fillStroke(SCOL.cape, 1.4, SCOL.capeLine);
-}
-
-function drawSaitamaPads() {
-  for (const s of [-1, 1]) {
-    ctx.save();
-    ctx.translate(17 * s, -195);
-    ctx.rotate(0.3 * s);
-    ctx.beginPath();
-    ctx.moveTo(-10, 2);
-    ctx.quadraticCurveTo(-11, -6, 0, -6.5);
-    ctx.quadraticCurveTo(11, -6, 10, 2);
-    ctx.quadraticCurveTo(0, 6, -10, 2);
-    ctx.closePath();
-    fillStroke(SCOL.cape, 1.3, SCOL.capeLine);
-    ell(0, -0.5, 3.4, 3.2, '#4c4c55', 1, '#26262c');
-    ell(-1, -1.6, 1.1, 0.9, '#9a9aa6', 0);
-    ctx.restore();
-  }
-}
-
 function drawSaitamaBag(hand, t) {
   ctx.save();
   ctx.translate(hand.x, hand.y);
@@ -3755,85 +3672,6 @@ function drawSaitamaBag(hand, t) {
   ctx.restore();
 }
 
-function drawSaitamaFace(t) {
-  const mode = eyeMode();
-  const amt = mode === 'sleep' || mode === 'happy' ? 1 : blinkAmt;
-  if (amt > 0.02) {
-    for (const e of [[41.5, 55.5, 9, 5], [70.5, 52.5, 8, 4.5]]) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(e[0], e[1], e[2] + 1.5, e[3] + 1.5, 0, 0, TAU);
-      ctx.clip();
-      const top = e[1] - e[3] - 2;
-      const h = (e[3] * 2 + 4) * amt;
-      ctx.fillStyle = SCOL.skin;
-      ctx.fillRect(e[0] - e[2] - 2, top, e[2] * 2 + 4, h);
-      ctx.restore();
-      ctx.beginPath();
-      if (mode === 'happy') {
-        ctx.moveTo(e[0] - e[2], e[1] + 1);
-        ctx.quadraticCurveTo(e[0], e[1] - e[3] - 2, e[0] + e[2], e[1] + 1);
-      } else {
-        const y = top + h;
-        ctx.moveTo(e[0] - e[2], y);
-        ctx.quadraticCurveTo(e[0], y + 1.5 * amt, e[0] + e[2], y);
-      }
-      ctx.strokeStyle = SCOL.line;
-      ctx.lineWidth = 2;
-      ctx.lineCap = 'round';
-      ctx.stroke();
-    }
-  }
-  let m = mouthMode();
-  if (state === 'punch') {
-    const ph = saiPunchPhase();
-    const heavy = punchKind === 'serious' || punchBig;
-    const flurry = punchKind === 'combo' && st / dur >= COMBO_FROM && st / dur < COMBO_TO;
-    m = flurry || (heavy && (ph.charge > 0.75 || ph.hold > 0)) ? 'shout' : null;
-    if (heavy && (ph.charge > 0.25 || ph.hold > 0)) {
-      const a = ph.hold > 0 ? 1 : clamp((ph.charge - 0.25) * 3, 0, 1);
-      ctx.save();
-      ctx.globalAlpha = a;
-      const g = ctx.createLinearGradient(0, 22, 0, 66);
-      g.addColorStop(0, 'rgba(30,14,10,0)');
-      g.addColorStop(0.45, 'rgba(30,14,10,0.62)');
-      g.addColorStop(1, 'rgba(30,14,10,0)');
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.ellipse(56, 48, 31, 17, 0, 0, TAU);
-      ctx.fill();
-      for (const e of [[41.5, 55.5, 8], [70.5, 52.5, 7]]) {
-        ctx.beginPath();
-        ctx.moveTo(e[0] - e[2], e[1] - 1);
-        ctx.quadraticCurveTo(e[0], e[1] - 3.5, e[0] + e[2], e[1] - 2.5);
-        ctx.quadraticCurveTo(e[0], e[1] + 1.5, e[0] - e[2], e[1] - 1);
-        ctx.fillStyle = '#ffffff';
-        ctx.fill();
-        ctx.strokeStyle = SCOL.line;
-        ctx.lineWidth = 1.6;
-        ctx.stroke();
-        ell(e[0] + 1, e[1] - 1.3, 1.4, 1.4, '#1a1010', 0);
-      }
-      ctx.beginPath();
-      ctx.moveTo(28, 40);
-      ctx.lineTo(50, 46);
-      ctx.moveTo(84, 38);
-      ctx.lineTo(62, 44);
-      ctx.strokeStyle = SCOL.line;
-      ctx.lineWidth = 2.6;
-      ctx.lineCap = 'round';
-      ctx.stroke();
-      ctx.restore();
-    }
-  }
-  const sz = { open: [4, 3], yawn: [5, 7.5], shout: [6.5, 5.5], chatter: [3.5, 1.5 + Math.abs(Math.sin(t * 30)) * 1.5], o: [3, 3] }[m];
-  if (sz) {
-    ell(59, 80, sz[0] + 1.5, sz[1] + 1.5, SCOL.skin, 0);
-    ell(59, 80, sz[0], sz[1], '#5b2a22', 1.4, SCOL.line);
-    ell(59, 80 + sz[1] * 0.45, sz[0] * 0.6, sz[1] * 0.35, '#c4625a', 0);
-  }
-}
-
 function drawSaitamaProp(prop, t) {
   if (!prop) return;
   ctx.save();
@@ -3843,64 +3681,22 @@ function drawSaitamaProp(prop, t) {
 }
 
 function drawSaitama(t, pz) {
-  if (!sLay) return;
-  headYCanvas = GROUND + pz.shift - pz.bob - 178;
+  headYCanvas = GROUND + pz.shift - pz.bob - 221;
   const hands = saiHands(pz, t);
   const ph = state === 'punch' && !drag ? saiPunchPhase() : null;
   const heavy = punchKind === 'serious' || punchBig;
-  const aura = ph ? Math.max(ph.charge, ph.hold * 0.7) * (heavy ? 1 : 0.45) : 0;
-
-  ctx.save();
-  if (aura > 0.02) {
-    ctx.shadowColor = punchKind === 'serious' ? 'rgba(255,226,120,0.95)' : 'rgba(255,255,255,0.9)';
-    ctx.shadowBlur = (6 + Math.abs(Math.sin(t * 31)) * 7) * aura;
-  }
-
-  drawSaitamaCape(t, pz);
-
-  const legs = pz.legs;
-  let legL = 0;
-  let legR = 0;
-  let sy = 0;
-  if (legs === 'walk' || legs === 'dance') {
-    const a = legs === 'dance' ? 0.26 : 0.2;
-    legL = Math.sin(phase) * a;
-    legR = -Math.sin(phase) * a;
-  } else if (legs === 'dangle') {
-    legL = Math.sin(t * 2.2) * 0.12;
-    legR = -Math.sin(t * 2.2) * 0.12;
-  } else if (legs === 'sit' || legs === 'curl') {
-    sy = (121 - pz.shift) / 121;
-    legL = 0.16;
-    legR = -0.16;
-  } else if (legs === 'brace') {
-    sy = (121 - pz.shift) / 121;
-    legL = pz.shift * 0.014;
-    legR = -pz.shift * 0.014;
-  }
-  saiPut('legL', legL, sy);
-  saiPut('legR', legR, sy);
-  saiPut('body');
-
-  const pv = SAI_PIVOT.head;
-  ctx.save();
-  ctx.scale(SAI.k, SAI.k);
-  ctx.translate(-SAI.ox, -SAI.oy + (pz.headDY || 0) * 0.35 / SAI.k);
-  ctx.translate(pv[0], pv[1]);
-  ctx.rotate((pz.tilt || 0) * 0.6);
-  ctx.translate(-pv[0], -pv[1]);
-  ctx.drawImage(sLay.head, 0, 0);
-  ctx.shadowBlur = 0;
-  drawSaitamaFace(t);
-  ctx.restore();
-
-  if (pz.arms === 'bag' && !drag) drawSaitamaBag(saiElbow({ x: -SAI_SHOULDER, y: -189 }, hands[0], -1).h, t);
-  saiArm(-1, hands[0]);
-  const fist = saiArm(1, hands[1]);
-  drawSaitamaPads();
-  ctx.restore();
+  const serious = ph && (ph.charge > .35 || ph.hold > 0);
+  const animated = window.HeroArt.saitama(ctx, { time: t, phase, walk: pz.legs === 'walk' || pz.legs === 'dance',
+    crouch: pz.shift, sit: pz.legs === 'sit' || pz.legs === 'curl', air: air || !!drag,
+    hands, cape: physicalCape, serious, blink: blinkAmt, look: look.x,
+    punch: ph ? st / dur : null, hitAt: punchHitAt(), landing: squash > .3, shop: state === 'shop',
+    headDY: pz.headDY, tilt: pz.tilt });
+  if (pz.arms === 'bag' && !drag && !animated) drawSaitamaBag(saiElbow({ x: -SAI_SHOULDER, y: -189 }, hands[0], -1).h, t);
   if (pz.prop && !drag) drawSaitamaProp(pz.prop, t);
-  if (ph && (ph.charge > 0 || ph.hold > 0)) drawSaitamaFistGlow(fist, ph, t, heavy);
+  if (ph && (ph.charge > 0 || ph.hold > 0)) {
+    const fist = animated ? SAI_FIST : saiElbow({ x: SAI_SHOULDER, y: -189 }, hands[1], 1).h;
+    drawSaitamaFistGlow(fist, ph, t, heavy);
+  }
 }
 
 function drawSaitamaFistGlow(f, ph, t, heavy) {
@@ -3937,6 +3733,7 @@ function drawSaitamaFistGlow(f, ph, t, heavy) {
 
 async function init() {
   try {
+    if (window.AnimeArt) await window.AnimeArt.ready;
     const i = await api.info();
     displays = i.displays || [];
     logDisplays('info', displays);

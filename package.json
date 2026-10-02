@@ -6,6 +6,7 @@
   "author": "atenafl",
   "scripts": {
     "start": "electron .",
+    "test": "node --test tests/*.test.js",
     "dist": "electron-builder --win portable"
   },
   "build": {
@@ -18,10 +19,22 @@
       "index.html",
       "main.js",
       "pet.js",
+      "hero-art.js",
+      "anime-art.js",
+      "animation-frames.js",
+      "transformations.js",
+      "fusions.js",
+      "animation-geometry.js",
+      "battle-engine.js",
+      "combat-controller.js",
+      "combat.html",
+      "combat.js",
+      "combat-preload.js",
       "preload.js",
       "overlay.html",
       "overlay.js",
       "overlay-preload.js",
+      "mon-sizes.ps1",
       "assets/**/*",
       "package.json"
     ],

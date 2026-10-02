@@ -2,6 +2,9 @@ const { app, BrowserWindow, ipcMain, screen, Menu, desktopCapturer } = require('
 const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
+const { CombatController } = require('./combat-controller');
+const transformations = require('./transformations');
+const fusions = require('./fusions');
 
 const W = 340;
 const H = 380;
@@ -12,18 +15,32 @@ let sound = true;
 let model = 'waifu';
 let sizeId = 'normal';
 const SIZES = ['small', 'normal', 'big'];
-const MODELS = ['waifu', 'webillo', 'saitama'];
+const MODELS = ['waifu', 'webillo', 'saitama', 'dragonball'];
 let disabled = new Set();
+let combat = null;
+let alwaysOnTop = true;
+
+function activateModel(m) {
+  if (!MODELS.includes(m)) return;
+  if (model !== m) closeOverlay();
+  model = m;
+  if (combat) combat.setModel(m);
+  if (win && !win.isDestroyed()) {
+    if (m === 'dragonball') win.hide();
+    else if (!win.isVisible()) win.showInactive();
+  }
+}
 
 function setModel(m) {
   if (MODELS.indexOf(m) < 0) return;
-  model = m;
+  activateModel(m);
   send('model:' + m);
 }
 
 function setSize(id) {
   if (SIZES.indexOf(id) < 0) return;
   sizeId = id;
+  if (combat) combat.scale = { small: 0.78, normal: 1, big: 1.3 }[id];
   send('size:' + id);
 }
 
@@ -263,11 +280,30 @@ async function bigPunch() {
   send('fx-ready');
 }
 
-function showMenu() {
+function showMenu(event) {
   const template = [
     {
-      label: 'Hacer cosas',
-      submenu: [
+      label: model === 'dragonball' ? 'Combate y vuelo' : 'Hacer cosas',
+      submenu: model === 'dragonball' ? [
+        { label: 'Pelear', type: 'radio', checked: combat.engine.mode === 'fight', click: () => combat.engine.setMode('fight') },
+        { label: 'Dejar de pelear y rondar pantallas', type: 'radio', checked: combat.engine.mode === 'roam', click: () => combat.engine.setMode('roam') },
+        { label: 'Transformaciones', submenu: transformations.levels.map((level) => ({
+          label: level.label, type: 'radio', checked: !combat.engine.fusion && !combat.engine.fusionPlan && combat.engine.form === level.id,
+          click: () => { combat.engine.automatic = false; combat.transform(level.id); }
+        })) },
+        { label: 'Escalar hasta Ultra Instinto y Ultra Ego', type: 'checkbox', checked: combat.engine.automatic,
+          click: (item) => { combat.engine.automatic = item.checked; if (item.checked) combat.transform('ss1'); } },
+        { label: 'Fusión', submenu: [
+          { label: 'Separar a Goku y Vegeta', enabled: !!(combat.engine.fusion || combat.engine.fusionPlan), click: () => combat.unfuse() },
+          { type: 'separator' },
+          ...fusions.modes.map((mode) => ({ label: mode.label, type: 'radio',
+            checked: (combat.engine.fusion?.id || combat.engine.fusionPlan?.mode.id) === mode.id, click: () => combat.fuse(mode.id) }))
+        ] },
+        { label: 'Rival de la fusión', submenu: fusions.opponents.map((opponent) => ({
+          label: opponent.label, type: 'radio', checked: combat.engine.opponent === opponent.id,
+          click: () => combat.setOpponent(opponent.id)
+        })) }
+      ] : [
         { label: 'Leer un libro', click: () => send('read') },
         { label: 'Tomar café', click: () => send('coffee') },
         { label: 'Desayunar', click: () => send('breakfast') },
@@ -292,19 +328,21 @@ function showMenu() {
         ...(model === 'saitama'
           ? [
               { label: 'Dar un puñetazo', click: () => bigPunch() },
+              { label: 'Invocar un monstruo', click: () => combat.spawnMonster() },
               { label: 'Ir a la compra', click: () => send('shop') }
             ]
           : []),
         { label: 'Despertar', click: () => send('wake') }
       ]
     },
-    { label: 'Acariciar', click: () => send('pet') },
+    ...(model === 'dragonball' ? [] : [{ label: 'Acariciar', click: () => send('pet') }]),
     {
       label: 'Modelo',
       submenu: [
         { label: 'Waifu', type: 'radio', checked: model === 'waifu', click: () => setModel('waifu') },
         { label: 'Webillo', type: 'radio', checked: model === 'webillo', click: () => setModel('webillo') },
-        { label: 'Saitama', type: 'radio', checked: model === 'saitama', click: () => setModel('saitama') }
+        { label: 'Saitama', type: 'radio', checked: model === 'saitama', click: () => setModel('saitama') },
+        { label: 'Goku y Vegeta', type: 'radio', checked: model === 'dragonball', click: () => setModel('dragonball') }
       ]
     },
     {
@@ -331,6 +369,7 @@ function showMenu() {
       checked: paused,
       click: (item) => {
         paused = !paused;
+        combat.paused = paused;
         item.checked = paused;
         send(paused ? 'pause-on' : 'pause-off');
       }
@@ -348,10 +387,11 @@ function showMenu() {
     {
       label: 'Siempre visible',
       type: 'checkbox',
-      checked: true,
+      checked: alwaysOnTop,
       click: (item) => {
-        const on = !item.checked;
-        item.checked = on;
+        const on = item.checked;
+        alwaysOnTop = on;
+        combat.setTop(on);
         if (win && !win.isDestroyed()) win.setAlwaysOnTop(on, 'screen-saver');
       }
     },
@@ -360,7 +400,8 @@ function showMenu() {
   ];
 
   const menu = Menu.buildFromTemplate(template);
-  if (win && !win.isDestroyed()) menu.popup({ window: win });
+  const owner = event && event.sender ? BrowserWindow.fromWebContents(event.sender) : win;
+  if (owner && !owner.isDestroyed()) menu.popup({ window: owner });
 }
 
 let winW = W;
@@ -410,12 +451,21 @@ ipcMain.on('pet-fx', (_e, type, data) => {
 ipcMain.on('overlay-done', closeOverlay);
 
 ipcMain.on('pet-model', (_e, m) => {
-  if (MODELS.indexOf(m) >= 0) model = m;
+  activateModel(m);
   if (model === 'saitama' && !overlay) createOverlay();
 });
 
 ipcMain.on('pet-sizemul', (_e, id) => {
   if (SIZES.indexOf(id) >= 0) sizeId = id;
+  if (combat) combat.scale = { small: 0.78, normal: 1, big: 1.3 }[sizeId];
+});
+
+ipcMain.on('battle-ignore', (event, value) => { if (combat) combat.ignore(event.sender, value); });
+ipcMain.on('pet-hero', (event, data) => {
+  if (combat && win && event.sender === win.webContents && model === 'saitama') combat.hero = data;
+});
+ipcMain.on('pet-monster-hit', (event) => {
+  if (combat && win && event.sender === win.webContents && model === 'saitama') combat.hitMonster();
 });
 
 ipcMain.on('pet-ignore', (_e, v) => {
@@ -438,6 +488,7 @@ ipcMain.on('pet-dragstate', (_e, on) => {
 });
 
 app.whenReady().then(() => {
+  combat = new CombatController({ displays: displayList, send, sound: () => sound });
   createWindow();
   screen.on('display-added', notifyDisplays);
   screen.on('display-removed', notifyDisplays);
@@ -451,3 +502,4 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => app.quit());
+app.on('before-quit', () => { if (combat) combat.close(); });

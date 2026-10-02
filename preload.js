@@ -13,5 +13,7 @@ contextBridge.exposeInMainWorld('petAPI', {
   onDisplays: (cb) => ipcRenderer.on('pet-displays', (_e, d) => cb(d)),
   dragState: (on) => ipcRenderer.send('pet-dragstate', !!on),
   fx: (type, data) => ipcRenderer.send('pet-fx', type, data),
+  hero: (data) => ipcRenderer.send('pet-hero', data),
+  monsterHit: () => ipcRenderer.send('pet-monster-hit'),
   onCursor: (cb) => ipcRenderer.on('pet-cursor', (_e, c) => cb(c))
 });
