@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Menu, desktopCapturer } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
@@ -164,6 +164,105 @@ function createWindow() {
   win.loadFile('index.html');
 }
 
+let overlay = null;
+let overlayReady = null;
+let overlayTimer = null;
+let fxBusy = false;
+let restoreTop = false;
+
+function createOverlay() {
+  overlay = new BrowserWindow({
+    width: 800,
+    height: 600,
+    show: false,
+    transparent: true,
+    frame: false,
+    resizable: false,
+    movable: false,
+    focusable: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    alwaysOnTop: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'overlay-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+  overlay.setIgnoreMouseEvents(true);
+  overlay.setAlwaysOnTop(true, 'screen-saver');
+  overlay.on('closed', () => {
+    overlay = null;
+    overlayReady = null;
+  });
+  overlayReady = overlay.loadFile('overlay.html').catch((e) => logdbg('overlay load failed: ' + e.message));
+  return overlayReady;
+}
+
+function closeOverlay() {
+  if (overlayTimer) {
+    clearTimeout(overlayTimer);
+    overlayTimer = null;
+  }
+  if (overlay && !overlay.isDestroyed()) overlay.hide();
+  if (restoreTop && win && !win.isDestroyed()) win.setAlwaysOnTop(false);
+  restoreTop = false;
+  fxBusy = false;
+}
+
+async function captureDisplay(d) {
+  try {
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: {
+        width: Math.round(d.bounds.width * d.scaleFactor),
+        height: Math.round(d.bounds.height * d.scaleFactor)
+      }
+    });
+    const src = sources.find((s) => String(s.display_id) === String(d.id)) ||
+      (sources.length === 1 ? sources[0] : null);
+    if (!src || src.thumbnail.isEmpty()) return null;
+    return 'data:image/jpeg;base64,' + src.thumbnail.toJPEG(92).toString('base64');
+  } catch (e) {
+    logdbg('capture failed: ' + e.message);
+    return null;
+  }
+}
+
+async function bigPunch() {
+  if (!win || win.isDestroyed()) return;
+  if (fxBusy) {
+    send('punch');
+    return;
+  }
+  fxBusy = true;
+  const d = screen.getDisplayMatching(win.getBounds());
+  const ready = overlay ? overlayReady : createOverlay();
+  send('punch-big');
+  win.setContentProtection(true);
+  const shot = await captureDisplay(d);
+  if (win && !win.isDestroyed()) win.setContentProtection(false);
+  try {
+    await ready;
+  } catch (e) {
+    logdbg('overlay load failed: ' + e.message);
+  }
+  if (!overlay || overlay.isDestroyed()) {
+    fxBusy = false;
+    return;
+  }
+
+  const b = d.bounds;
+  overlay.setBounds(b);
+  overlay.webContents.send('fx', 'init', { shot, bounds: b });
+  overlay.showInactive();
+  restoreTop = !win.isAlwaysOnTop();
+  win.setAlwaysOnTop(true, 'screen-saver');
+  win.moveTop();
+  overlayTimer = setTimeout(closeOverlay, 14000);
+  send('fx-ready');
+}
+
 function showMenu() {
   const template = [
     {
@@ -192,7 +291,7 @@ function showMenu() {
         { label: 'Taparse los ojos', click: () => send('peek') },
         ...(model === 'saitama'
           ? [
-              { label: 'Dar un puñetazo', click: () => send('punch') },
+              { label: 'Dar un puñetazo', click: () => bigPunch() },
               { label: 'Ir a la compra', click: () => send('shop') }
             ]
           : []),
@@ -304,8 +403,15 @@ ipcMain.handle('pet-info', async () => {
 
 ipcMain.on('pet-menu', showMenu);
 
+ipcMain.on('pet-fx', (_e, type, data) => {
+  if (fxBusy && overlay && !overlay.isDestroyed()) overlay.webContents.send('fx', type, data);
+});
+
+ipcMain.on('overlay-done', closeOverlay);
+
 ipcMain.on('pet-model', (_e, m) => {
   if (MODELS.indexOf(m) >= 0) model = m;
+  if (model === 'saitama' && !overlay) createOverlay();
 });
 
 ipcMain.on('pet-sizemul', (_e, id) => {

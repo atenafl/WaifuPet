@@ -109,8 +109,23 @@ let trailT = 0;
 let winkT = 0;
 let lastHopS = null;
 let punchKind = 'normal';
+let punchBig = false;
 let shakeT = 0;
+let shakeAmp = 0;
 let comboT = 0;
+let impactT = 0;
+let chargeFxT = 0;
+let joltT = 0;
+let fxReady = false;
+let fxWaitT = 0;
+
+const PUNCH_DUR = { normal: 2.6, combo: 3.6, serious: 4.2 };
+const COMBO_FROM = 0.14;
+const COMBO_TO = 0.68;
+
+function punchHitAt() {
+  return punchKind === 'serious' ? 0.5 : punchKind === 'combo' ? 0.8 : 0.38;
+}
 
 let blinkClose = 0;
 let blinkT = 2;
@@ -582,6 +597,10 @@ function say(t) {
 }
 
 function setState(s) {
+  if (punchBig) {
+    punchBig = false;
+    if (api.fx) api.fx('end', {});
+  }
   state = s;
   st = 0;
   phase = 0;
@@ -591,9 +610,52 @@ function setState(s) {
   if (s === 'punch') {
     const r = Math.random();
     punchKind = r < 0.6 ? 'normal' : r < 0.85 ? 'combo' : 'serious';
-    if (punchKind !== 'normal') dur = 2.8;
+    dur = PUNCH_DUR[punchKind];
     comboT = 0;
+    chargeFxT = 0;
+    joltT = 0;
     say(pick(punchKind === 'combo' ? PH.punchCombo : punchKind === 'serious' ? PH.punchSerious : PH.punch));
+  }
+}
+
+function fistGlobal() {
+  const f = fistPoint();
+  return { x: pos.x + f.x * F(), y: pos.y + f.y * Fh() };
+}
+
+function startBigPunch() {
+  if (modelId !== 'saitama') return;
+  if (air) {
+    air = false;
+    vy = 0;
+    pos.y = groundY();
+  }
+  setState('punch');
+  punchBig = true;
+  fxReady = false;
+  fxWaitT = 0;
+}
+
+function punchChargeEnd() {
+  return (punchKind === 'combo' ? COMBO_FROM : punchHitAt()) * dur;
+}
+
+function onFxReady() {
+  if (state !== 'punch' || !punchBig || fxReady) return;
+  fxReady = true;
+  const end = punchChargeEnd();
+  if (end - st < 0.9) st = Math.max(0, end - 0.9);
+  const left = end - st;
+  chargeSound(left, punchKind === 'serious');
+  if (api.fx) {
+    api.fx('charge', {
+      kind: punchKind,
+      dir,
+      charge: left,
+      center: { x: pos.x + (W / 2) * F(), y: pos.y + (GROUND - 120) * Fh() },
+      ground: pos.y + GROUND * Fh(),
+      fist: fistGlobal()
+    });
   }
 }
 
@@ -681,6 +743,12 @@ function doAction(a) {
     case 'punch':
     case 'shop':
       if (modelId === 'saitama') setStateSay(a);
+      break;
+    case 'punch-big':
+      startBigPunch();
+      break;
+    case 'fx-ready':
+      onFxReady();
       break;
     case 'size:small': setSize('small'); break;
     case 'size:normal': setSize('normal'); break;
@@ -772,6 +840,47 @@ function punchSound(big) {
   og.connect(a.destination);
   o.start(t);
   o.stop(t + len);
+}
+
+function chargeSound(sec, big) {
+  if (!soundOn) return;
+  const a = getAudio();
+  if (!a) return;
+  const t = a.currentTime;
+  const buf = a.createBuffer(1, Math.floor(a.sampleRate * sec), a.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const noise = a.createBufferSource();
+  noise.buffer = buf;
+  const f = a.createBiquadFilter();
+  f.type = 'bandpass';
+  f.Q.value = 0.8;
+  f.frequency.setValueAtTime(180, t);
+  f.frequency.exponentialRampToValueAtTime(big ? 1400 : 900, t + sec);
+  const g = a.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(big ? 0.28 : 0.16, t + sec * 0.95);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + sec);
+  noise.connect(f);
+  f.connect(g);
+  g.connect(a.destination);
+  noise.start(t);
+  const o = a.createOscillator();
+  const og = a.createGain();
+  o.type = 'sawtooth';
+  o.frequency.setValueAtTime(45, t);
+  o.frequency.exponentialRampToValueAtTime(big ? 110 : 80, t + sec);
+  const lp = a.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 260;
+  og.gain.setValueAtTime(0.0001, t);
+  og.gain.exponentialRampToValueAtTime(big ? 0.22 : 0.12, t + sec * 0.95);
+  og.gain.exponentialRampToValueAtTime(0.0001, t + sec);
+  o.connect(lp);
+  lp.connect(og);
+  og.connect(a.destination);
+  o.start(t);
+  o.stop(t + sec);
 }
 
 function hit(x, y) {
@@ -1185,6 +1294,41 @@ function spawnStreaks(n, big) {
   }
 }
 
+function spawnRise(big) {
+  const rock = Math.random() < (big ? 0.55 : 0.3);
+  parts.push({
+    t: rock ? 'conf' : 'dust',
+    x: W / 2 + rand(-70, 70),
+    y: GROUND - rand(0, 6),
+    vx: rand(-6, 6),
+    vy: rand(-60, -25) * (big ? 1.4 : 1),
+    g: rock ? -10 : -6,
+    life: 0,
+    max: rand(0.9, 1.6),
+    s: rock ? rand(2.5, 5) : rand(3, 6),
+    rot: rand(0, TAU),
+    vr: rand(-4, 4),
+    col: rock ? '#8b8072' : '#c9bea8'
+  });
+}
+
+function spawnAuraSpark(big) {
+  parts.push({
+    t: 'spark',
+    x: W / 2 + rand(-34, 34),
+    y: GROUND - rand(30, 250),
+    vx: rand(-8, 8),
+    vy: rand(-90, -40),
+    g: 0,
+    life: 0,
+    max: rand(0.3, 0.6),
+    s: rand(4, 8) * (big ? 1.3 : 1),
+    rot: rand(0, TAU),
+    vr: rand(-6, 6),
+    col: big ? '#fff2a8' : '#ffffff'
+  });
+}
+
 function spawnFistGhost() {
   const f = fistPoint(rand(-14, 6), rand(-22, 22));
   parts.push({
@@ -1389,8 +1533,11 @@ function pose() {
       return { shift: 0, legs: 'stand', arms: 'clap', prop: null, headDY: 0, tilt: 0.02, irisDy: 0, bob: Math.abs(Math.sin(phase)) * 2 };
     case 'peek':
       return { shift: 4, legs: 'stand', arms: 'peek', prop: null, headDY: 3, tilt: 0.06, irisDy: 2, bob: 0 };
-    case 'punch':
-      return { shift: 0, legs: 'stand', arms: 'punch', prop: null, headDY: 0, tilt: 0, irisDy: 0, bob: 0 };
+    case 'punch': {
+      const ph = modelId === 'saitama' ? saiPunchPhase() : { charge: 0, hold: 0 };
+      const crouch = ph.charge > 0 ? ease(Math.min(1, ph.charge * 2)) * 9 : ph.hold * 5;
+      return { shift: crouch, legs: 'brace', arms: 'punch', prop: null, headDY: crouch * 0.6, tilt: ph.charge * 0.08 - ph.hold * 0.05, irisDy: 0, bob: 0 };
+    }
     case 'shop':
       return { shift: 0, legs: 'walk', arms: 'bag', prop: null, headDY: 0, tilt: 0.03, irisDy: 0, bob: Math.abs(Math.sin(phase)) * 3 };
     default:
@@ -1453,28 +1600,60 @@ function update(dt) {
 
       switch (state) {
         case 'punch': {
-          const p = st / dur;
-          const hitAt = punchKind === 'serious' ? 0.42 : punchKind === 'combo' ? 0.12 : 0.3;
-          const big = punchKind === 'serious';
-          if (big && p < hitAt) shakeT = Math.max(shakeT, 0.05);
-          if (!stateFired && p >= hitAt) {
-            stateFired = true;
-            spawnShock(big);
-            spawnStreaks(big ? 16 : 6, big);
-            spawnDust(big ? 9 : 4);
-            shakeT = big ? 0.65 : 0.25;
-            punchSound(big);
-            if (big) squash = 0.5;
+          if (punchBig && !fxReady) {
+            fxWaitT += dt;
+            const holdAt = punchChargeEnd() - 0.3;
+            if (st > holdAt && fxWaitT < 4) st = holdAt;
           }
-          if (punchKind === 'combo' && p >= hitAt && p < 0.8) {
+          const p = st / dur;
+          const h = punchHitAt();
+          const serious = punchKind === 'serious';
+          const heavy = serious || punchBig;
+          const flurry = punchKind === 'combo' && p >= COMBO_FROM && p < COMBO_TO;
+          if (!stateFired && !flurry && (punchKind !== 'combo' || p >= COMBO_TO || p < COMBO_FROM)) {
+            const k = punchKind === 'combo' ? 1 : clamp(p / h, 0, 1);
+            chargeFxT -= dt;
+            if (chargeFxT <= 0) {
+              spawnRise(serious);
+              if (heavy || Math.random() < 0.5) spawnAuraSpark(serious);
+              chargeFxT = heavy ? 0.035 : 0.09;
+            }
+            if (heavy) {
+              shakeT = Math.max(shakeT, 0.06);
+              shakeAmp = (serious ? 2.6 : 1.4) * k * (punchBig ? 2 : 1);
+            }
+          }
+          if (!stateFired && p >= h) {
+            stateFired = true;
+            impactT = 0.1;
+            spawnShock(heavy);
+            spawnStreaks(heavy ? 18 : 7, heavy);
+            spawnDust(heavy ? 10 : 5);
+            if (heavy) spawnSparkles(6);
+            shakeT = heavy ? 1.1 : 0.3;
+            shakeAmp = punchBig ? (serious ? 16 : 11) : serious ? 5 : 2.5;
+            punchSound(heavy);
+            squash = heavy ? 0.55 : 0.2;
+            if (punchBig && api.fx) api.fx('impact', { kind: punchKind, dir, fist: fistGlobal() });
+          }
+          if (flurry) {
             phase += dt * 26;
             comboT -= dt;
             if (comboT <= 0) {
               spawnFistGhost();
               spawnFistGhost();
               spawnStreaks(1);
-              shakeT = Math.max(shakeT, 0.06);
+              shakeT = Math.max(shakeT, 0.08);
+              shakeAmp = Math.max(shakeAmp, punchBig ? 4 : 1.5);
               comboT = 0.045;
+            }
+            if (punchBig) {
+              joltT -= dt;
+              if (joltT <= 0) {
+                punchSound(false);
+                if (api.fx) api.fx('jolt', { dir, fist: fistGlobal() });
+                joltT = 0.11;
+              }
             }
           }
           break;
@@ -1636,6 +1815,7 @@ function update(dt) {
 
     squash = Math.max(0, squash - dt * 4.5);
     shakeT = Math.max(0, shakeT - dt);
+    impactT = Math.max(0, impactT - dt);
   }
 
   if (mouse.in && state !== 'sleep' && state !== 'walk' && state !== 'shop' && state !== 'punch') {
@@ -2489,8 +2669,8 @@ function drawScene(dt) {
     ctx.translate(Math.sin(time * 62) * 2.6, Math.sin(time * 47) * 1.3);
   }
   if (shakeT > 0 && !drag) {
-    const k = Math.min(1, shakeT * 4) * (punchKind === 'serious' ? 4 : 2);
-    ctx.translate(Math.sin(time * 91) * k, Math.sin(time * 73) * k * 0.6);
+    const k = Math.min(1, shakeT * 1.6) * shakeAmp;
+    ctx.translate((Math.sin(time * 91) * 0.7 + Math.sin(time * 57) * 0.3) * k, (Math.sin(time * 73) * 0.7 + Math.cos(time * 49) * 0.3) * k * 0.7);
   }
   if (state === 'spin' && !drag) {
     ctx.translate(0, -110);
@@ -2501,7 +2681,9 @@ function drawScene(dt) {
   if (modelId === 'webillo') {
     drawWebillo(time, pz);
   } else if (modelId === 'saitama') {
+    if (impactT > 0) ctx.filter = 'grayscale(1) contrast(6) invert(1)';
     drawSaitama(time, pz);
+    ctx.filter = 'none';
   } else {
     drawTail(time);
     drawBackHair();
@@ -2516,8 +2698,28 @@ function drawScene(dt) {
 
   ctx.restore();
 
+  if (impactT > 0 && modelId === 'saitama') drawFocusLines();
   drawParts();
   drawBubble(dt);
+}
+
+function drawFocusLines() {
+  const f = fistPoint();
+  ctx.save();
+  ctx.fillStyle = 'rgba(10,10,14,0.85)';
+  const n = 46;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU + Math.sin(i * 12.9898) * 0.05;
+    const w = 0.012 + Math.abs(Math.sin(i * 78.233)) * 0.02;
+    const r0 = 26 + Math.abs(Math.sin(i * 3.7)) * 30;
+    ctx.beginPath();
+    ctx.moveTo(f.x + Math.cos(a) * r0, f.y + Math.sin(a) * r0);
+    ctx.lineTo(f.x + Math.cos(a - w) * 600, f.y + Math.sin(a - w) * 600);
+    ctx.lineTo(f.x + Math.cos(a + w) * 600, f.y + Math.sin(a + w) * 600);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 // ---------- webillo model ----------
@@ -3319,37 +3521,49 @@ function saiPunchHands(t) {
   const p = st / dur;
   const restL = { x: -26, y: -106 };
   const restR = { x: 26, y: -106 };
-  const guardL = { x: -2, y: -180 };
-  const cocked = { x: 6, y: -172 };
+  const guardL = { x: -4, y: -184 };
+  const cocked = { x: -2, y: -152 };
   const out = { x: SAI_FIST.x, y: SAI_FIST.y };
-  if (punchKind === 'combo') {
-    if (p < 0.12) {
-      const k = ease(p / 0.12);
-      return [lerpP(restL, guardL, k), lerpP(restR, cocked, k)];
+  const h = punchHitAt();
+  const tremble = (k) => (punchKind === 'serious' || punchBig ? Math.sin(t * 70) * 1.8 * k : 0);
+  if (punchKind === 'combo' && p < COMBO_TO) {
+    if (p < COMBO_FROM) {
+      const k = ease(p / COMBO_FROM);
+      return [lerpP(restL, guardL, k), lerpP(restR, { x: 6, y: -172 }, k)];
     }
-    if (p < 0.8) {
-      const s = Math.sin(phase);
-      const jit = Math.sin(t * 57) * 6;
-      const outL = { x: out.x - 30, y: out.y + 6 + jit };
-      const outR = { x: out.x, y: out.y - jit };
-      return s > 0 ? [guardL, outR] : [outL, cocked];
-    }
-    const k = ease(clamp((p - 0.8) / 0.15, 0, 1));
-    return [lerpP(guardL, restL, k), lerpP(cocked, restR, k)];
+    const s = Math.sin(phase);
+    const jit = Math.sin(t * 57) * 6;
+    const outL = { x: out.x - 30, y: out.y + 6 + jit };
+    const outR = { x: out.x, y: out.y - jit };
+    return s > 0 ? [guardL, outR] : [outL, { x: 6, y: -172 }];
   }
-  const hitAt = punchKind === 'serious' ? 0.42 : 0.3;
-  if (p < hitAt) {
-    const k = ease(clamp(p / (hitAt * 0.7), 0, 1));
-    const tremble = punchKind === 'serious' ? Math.sin(t * 70) * 1.5 * k : 0;
-    return [lerpP(restL, guardL, k), { x: lerp(restR.x, cocked.x, k) + tremble, y: lerp(restR.y, cocked.y, k) }];
+  const from = punchKind === 'combo' ? COMBO_TO : 0;
+  if (p < h) {
+    const k = ease(clamp((p - from) / ((h - from) * 0.55), 0, 1));
+    const tr = tremble(k);
+    return [lerpP(restL, guardL, k), { x: lerp(restR.x, cocked.x, k) + tr, y: lerp(restR.y, cocked.y, k) + tr * 0.5 }];
   }
-  if (p < hitAt + 0.04) {
-    const k = (p - hitAt) / 0.04;
-    return [guardL, lerpP(cocked, out, k)];
+  const strike = 0.022;
+  if (p < h + strike) {
+    const k = (p - h) / strike;
+    return [guardL, lerpP(cocked, { x: out.x + 6, y: out.y }, k * k)];
   }
-  if (p < 0.72) return [guardL, out];
-  const k = ease(clamp((p - 0.72) / 0.18, 0, 1));
+  const holdTo = Math.min(0.9, h + (punchKind === 'serious' ? 0.3 : 0.32));
+  if (p < holdTo) {
+    const k = clamp((p - h - strike) / 0.05, 0, 1);
+    return [guardL, { x: out.x + 6 * (1 - k), y: out.y + Math.sin(t * 40) * (1 - k) * 2 }];
+  }
+  const k = ease(clamp((p - holdTo) / 0.08, 0, 1));
   return [lerpP(guardL, restL, k), lerpP(out, restR, k)];
+}
+
+function saiPunchPhase() {
+  const p = st / dur;
+  const h = punchHitAt();
+  if (punchKind === 'combo' && p < COMBO_TO) return { charge: p < COMBO_FROM ? p / COMBO_FROM : 0, hold: 0 };
+  const from = punchKind === 'combo' ? COMBO_TO : 0;
+  if (p < h) return { charge: clamp((p - from) / (h - from), 0, 1), hold: 0 };
+  return { charge: 0, hold: p < Math.min(0.9, h + 0.32) ? 1 : 0 };
 }
 
 function saiHands(pz, t) {
@@ -3450,13 +3664,11 @@ function saiArm(side, hand) {
 }
 
 function drawSaitamaCape(t, pz) {
-  const moving = pz.legs === 'walk' || drag;
+  const ph = state === 'punch' && !drag ? saiPunchPhase() : null;
+  const moving = pz.legs === 'walk' || drag || (ph && (ph.charge > 0.2 || ph.hold > 0));
   let drift = moving ? 16 : 0;
-  if (state === 'punch' && !drag) {
-    const p = st / dur;
-    const hitAt = punchKind === 'serious' ? 0.42 : punchKind === 'combo' ? 0.12 : 0.3;
-    if (p >= hitAt && p < 0.85) drift = punchKind === 'serious' ? 40 : 26;
-  }
+  if (ph && ph.charge > 0) drift = 10 + ph.charge * (punchKind === 'serious' || punchBig ? 22 : 10);
+  if (ph && ph.hold > 0) drift = punchKind === 'serious' || punchBig ? 48 : 28;
   const fl = Math.sin(t * (moving ? 9 : 3)) * (moving ? 4 : 1.6);
   const fl2 = Math.sin(t * (moving ? 9 : 3) + 1.3) * (moving ? 5 : 2);
   const bottom = -46;
@@ -3573,7 +3785,47 @@ function drawSaitamaFace(t) {
     }
   }
   let m = mouthMode();
-  if (state === 'punch') m = punchKind === 'normal' ? null : 'shout';
+  if (state === 'punch') {
+    const ph = saiPunchPhase();
+    const heavy = punchKind === 'serious' || punchBig;
+    const flurry = punchKind === 'combo' && st / dur >= COMBO_FROM && st / dur < COMBO_TO;
+    m = flurry || (heavy && (ph.charge > 0.75 || ph.hold > 0)) ? 'shout' : null;
+    if (heavy && (ph.charge > 0.25 || ph.hold > 0)) {
+      const a = ph.hold > 0 ? 1 : clamp((ph.charge - 0.25) * 3, 0, 1);
+      ctx.save();
+      ctx.globalAlpha = a;
+      const g = ctx.createLinearGradient(0, 22, 0, 66);
+      g.addColorStop(0, 'rgba(30,14,10,0)');
+      g.addColorStop(0.45, 'rgba(30,14,10,0.62)');
+      g.addColorStop(1, 'rgba(30,14,10,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(56, 48, 31, 17, 0, 0, TAU);
+      ctx.fill();
+      for (const e of [[41.5, 55.5, 8], [70.5, 52.5, 7]]) {
+        ctx.beginPath();
+        ctx.moveTo(e[0] - e[2], e[1] - 1);
+        ctx.quadraticCurveTo(e[0], e[1] - 3.5, e[0] + e[2], e[1] - 2.5);
+        ctx.quadraticCurveTo(e[0], e[1] + 1.5, e[0] - e[2], e[1] - 1);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.strokeStyle = SCOL.line;
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+        ell(e[0] + 1, e[1] - 1.3, 1.4, 1.4, '#1a1010', 0);
+      }
+      ctx.beginPath();
+      ctx.moveTo(28, 40);
+      ctx.lineTo(50, 46);
+      ctx.moveTo(84, 38);
+      ctx.lineTo(62, 44);
+      ctx.strokeStyle = SCOL.line;
+      ctx.lineWidth = 2.6;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
   const sz = { open: [4, 3], yawn: [5, 7.5], shout: [6.5, 5.5], chatter: [3.5, 1.5 + Math.abs(Math.sin(t * 30)) * 1.5], o: [3, 3] }[m];
   if (sz) {
     ell(59, 80, sz[0] + 1.5, sz[1] + 1.5, SCOL.skin, 0);
@@ -3594,6 +3846,15 @@ function drawSaitama(t, pz) {
   if (!sLay) return;
   headYCanvas = GROUND + pz.shift - pz.bob - 178;
   const hands = saiHands(pz, t);
+  const ph = state === 'punch' && !drag ? saiPunchPhase() : null;
+  const heavy = punchKind === 'serious' || punchBig;
+  const aura = ph ? Math.max(ph.charge, ph.hold * 0.7) * (heavy ? 1 : 0.45) : 0;
+
+  ctx.save();
+  if (aura > 0.02) {
+    ctx.shadowColor = punchKind === 'serious' ? 'rgba(255,226,120,0.95)' : 'rgba(255,255,255,0.9)';
+    ctx.shadowBlur = (6 + Math.abs(Math.sin(t * 31)) * 7) * aura;
+  }
 
   drawSaitamaCape(t, pz);
 
@@ -3612,6 +3873,10 @@ function drawSaitama(t, pz) {
     sy = (121 - pz.shift) / 121;
     legL = 0.16;
     legR = -0.16;
+  } else if (legs === 'brace') {
+    sy = (121 - pz.shift) / 121;
+    legL = pz.shift * 0.014;
+    legR = -pz.shift * 0.014;
   }
   saiPut('legL', legL, sy);
   saiPut('legR', legR, sy);
@@ -3625,14 +3890,47 @@ function drawSaitama(t, pz) {
   ctx.rotate((pz.tilt || 0) * 0.6);
   ctx.translate(-pv[0], -pv[1]);
   ctx.drawImage(sLay.head, 0, 0);
+  ctx.shadowBlur = 0;
   drawSaitamaFace(t);
   ctx.restore();
 
   if (pz.arms === 'bag' && !drag) drawSaitamaBag(saiElbow({ x: -SAI_SHOULDER, y: -189 }, hands[0], -1).h, t);
   saiArm(-1, hands[0]);
-  saiArm(1, hands[1]);
+  const fist = saiArm(1, hands[1]);
   drawSaitamaPads();
+  ctx.restore();
   if (pz.prop && !drag) drawSaitamaProp(pz.prop, t);
+  if (ph && (ph.charge > 0 || ph.hold > 0)) drawSaitamaFistGlow(fist, ph, t, heavy);
+}
+
+function drawSaitamaFistGlow(f, ph, t, heavy) {
+  const flick = 0.75 + Math.abs(Math.sin(t * 37)) * 0.25;
+  const r = ph.charge > 0 ? (5 + ph.charge * (heavy ? 22 : 11)) * flick : (heavy ? 18 : 10) * flick;
+  const a = ph.charge > 0 ? Math.min(1, ph.charge * 1.4) : 0.8;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, r);
+  g.addColorStop(0, `rgba(255,255,255,${0.95 * a})`);
+  g.addColorStop(0.35, `rgba(255,236,150,${0.7 * a})`);
+  g.addColorStop(1, 'rgba(255,190,60,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(f.x, f.y, r, 0, TAU);
+  ctx.fill();
+  if (ph.charge > 0.4 && heavy) {
+    ctx.strokeStyle = `rgba(255,250,210,${0.8 * a})`;
+    ctx.lineWidth = 1.4;
+    for (let i = 0; i < 5; i++) {
+      const an = t * 9 + i * 1.257;
+      const r0 = r * 0.35;
+      const r1 = r * (0.9 + Math.sin(t * 23 + i) * 0.25);
+      ctx.beginPath();
+      ctx.moveTo(f.x + Math.cos(an) * r0, f.y + Math.sin(an) * r0);
+      ctx.lineTo(f.x + Math.cos(an + 0.3) * r1, f.y + Math.sin(an + 0.3) * r1);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
 }
 
 // ---------- boot ----------

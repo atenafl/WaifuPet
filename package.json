@@ -19,6 +19,9 @@
       "main.js",
       "pet.js",
       "preload.js",
+      "overlay.html",
+      "overlay.js",
+      "overlay-preload.js",
       "assets/**/*",
       "package.json"
     ],

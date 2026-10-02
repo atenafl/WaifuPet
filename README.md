@@ -29,7 +29,10 @@ Electron + Canvas (sin frameworks).
 - **Tres modelos**: waifu (canvas vectorial), webillo (pixel art) y Saitama
   (sprite recortado con brazos y capa en canvas). Saitama además da
   puñetazos (normal, consecutivos y serio, con onda de choque) y va a la
-  compra con su bolsa.
+  compra con su bolsa. El puñetazo pedido desde el menú sacude todo el
+  monitor: captura la pantalla y la tiembla en una capa a pantalla completa
+  (sin tocar tus ventanas, los clics la atraviesan) con carga, fotograma de
+  impacto manga, ondas, escombros y grietas.
 - **Animaciones**: paseo, baile, sueño, café, lectura, teléfono, cigarrillo,
   desayuno, canto, videojuego, estirarse, saludar, bostezar, tiritar,
   estornudar, animarse con confeti, saltos de conejo, girar, aplaudir,
@@ -54,5 +57,7 @@ compilar desde una terminal **como administrador**.
 - `main.js` — proceso principal de Electron (ventana, monitor, menú, IPC)
 - `pet.js` — todo el motor de la mascota (física, estados, animaciones, dibujo)
 - `preload.js` — puente IPC
+- `overlay.html` / `overlay.js` / `overlay-preload.js` — capa a pantalla
+  completa de los efectos del puñetazo
 - `assets/webillo.png` — sprite de webillo e icono de la app
 - `assets/saitama.png` — sprite de Saitama (sin capa ni brazos)
