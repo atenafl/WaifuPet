@@ -62,6 +62,22 @@ app.whenReady().then(async () => {
       await wait(100);
       for (const kind of ['goku', 'vegeta']) assert.equal(await c.windows.get(kind).webContents.executeJavaScript('frame.form'), form.id);
     }
+    const energySeen = new Set();
+    for (let n = 0; n < 12000 && energySeen.size < 3; n++) {
+      const events = c.engine.update(1 / 30, screens, .88 * c.scale);
+      if (events.includes('charge')) {
+        c.tick(1 / 30); await wait(30);
+        const actor = c.windows.get(c.engine.fighters[c.engine.attacker].kind);
+        assert.ok(await actor.webContents.executeJavaScript('Number.isFinite(AnimeArt.chargePoint(frame).x)'));
+      }
+      if (c.engine.phase === 'blast' && c.engine.beam?.progress > .2 && !energySeen.has(c.engine.energyAttack)) {
+        c.drawBeam(.88 * c.scale); await wait(30);
+        const actual = await c.windows.get('beam').webContents.executeJavaScript('({attack:frame.attack,shots:frame.shots.length,pixels:canvas.getContext("2d").getImageData(0,0,canvas.width,canvas.height).data.some((v,i)=>i%4===3&&v>0)})');
+        assert.equal(actual.attack, c.engine.energyAttack); assert.ok(actual.shots > 0 && actual.pixels);
+        energySeen.add(actual.attack);
+      }
+    }
+    assert.deepEqual([...energySeen].sort(), ['final-flash', 'galick', 'kamehameha']);
     c.engine.setMode('roam'); await wait(150);
     for (const kind of ['goku', 'vegeta']) assert.equal(await c.windows.get(kind).webContents.executeJavaScript('frame.pose'), 'fly');
     c.engine.setMode('fight');
@@ -75,6 +91,20 @@ app.whenReady().then(async () => {
       assert.equal(await c.windows.get('vegeta').webContents.executeJavaScript('frame.character'), 'buu');
       await c.setOpponent('broly'); c.tick(1 / 30); await wait(80);
       assert.equal(await c.windows.get('vegeta').webContents.executeJavaScript('frame.character'), 'broly');
+      if (mode.id === require('../fusions').modes[0].id) {
+        const brolySeen = new Set();
+        for (let n = 0; n < 12000 && brolySeen.size < 2; n++) {
+          c.engine.update(1 / 30, screens, .88 * c.scale);
+          if (c.engine.phase === 'blast' && c.engine.attacker === 1 && c.engine.age > .35 && !brolySeen.has(c.engine.energyAttack)) {
+            c.drawBeam(.88 * c.scale); await wait(30);
+            const actual = await c.windows.get('beam').webContents.executeJavaScript('({attack:frame.attack,count:frame.shots.length,valid:frame.shots.every(s=>!s.target||Number.isFinite(s.target.x))})');
+            assert.equal(actual.attack, c.engine.energyAttack); assert.ok(actual.valid);
+            if (actual.attack === 'broly-barrage') assert.ok(actual.count > 1);
+            brolySeen.add(actual.attack);
+          }
+        }
+        assert.deepEqual([...brolySeen].sort(), ['broly-barrage', 'broly-cannon']);
+      }
       c.engine.setMode('roam'); c.tick(1 / 30); await wait(80);
       assert.equal(await c.windows.get('goku').webContents.executeJavaScript('frame.pose'), 'fly');
       await c.unfuse(); c.tick(1 / 30); await wait(80);
@@ -85,7 +115,7 @@ app.whenReady().then(async () => {
     await win.webContents.executeJavaScript("doAction('model:webillo')"); await wait(200);
     assert.equal(c.windows.size, 0);
     assert.equal(errors.length, 0, errors.join('\n'));
-    process.stdout.write('PASS: Saitama, eight transformation pairs, four fusion rituals, Buu/Broly, unfusing, roaming and cleanup; no renderer errors.\n');
+    process.stdout.write('PASS: Saitama, eight transformation pairs, four fusion rituals, five energy attacks including Broly barrage/cannon, unfusing, roaming and cleanup; no renderer errors.\n');
   } catch (e) { process.stderr.write(e.stack + '\n'); resultCode = 1; }
   if (c) c.close(); if (win) win.destroy(); app.exit(resultCode);
 });

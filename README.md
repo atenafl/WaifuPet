@@ -52,6 +52,15 @@ Electron + Canvas (sin frameworks).
   completas, con una breve carga al transformarse; se mantiene en el nivel final.
   Seleccionar una forma manualmente desactiva la subida automática. El modo de paseo
   conserva la forma, pero detiene los ataques y la progresión.
+- **Ataques de energía propios**: Goku dispara un Kamehameha azul con núcleo blanco,
+  ondas y anillos de presión; Vegeta alterna Cañón Galick violeta con espirales y
+  Final Flash dorado, más ancho y con una carga de 2,05 segundos. La esfera de carga
+  sigue las manos recogidas y el haz sale desde las palmas extendidas. Los rayos
+  tienen propagación, retroceso, explosiones y disipación; solo causan impacto al
+  alcanzar al rival. Vegito usa Final Kamehameha, Gogeta Kamehameha y Buu su onda rosa.
+  Broly alterna cinco proyectiles verdes con trayectorias curvas e impactos
+  escalonados y un cañón de energía gigante con una explosión mayor. El sonido
+  acompaña la carga y el disparo; las ráfagas se cancelan al cambiar de modo o rival.
 - **Vegito y Gogeta**, ambos en SS1 y Blue: clic derecho → **Combate y vuelo → Fusión**.
   Goku y Vegeta se reúnen en el mismo monitor; Vegito usa atracción Potara y Gogeta
   realiza la danza con contacto de los dedos, seguido de un destello y aparición
@@ -61,6 +70,10 @@ Electron + Canvas (sin frameworks).
   necesarios y reaparece después de la recuperación para otra ronda.
   **Separar a Goku y Vegeta** o seleccionar una transformación normal cancela la
   fusión; el modo de paseo mantiene al fusionado y su rival sin ataques.
+  Goku, Vegeta, Vegito, Gogeta y Buu tienen la misma escala (100 %); Broly usa 120 % y
+  supera en tamaño a todos. Cada personaje del atlas se normaliza por separado
+  para que sus poses mantengan esas proporciones. La ventana, los puntos de contacto,
+  el origen de los rayos y los límites de pantalla respetan el tamaño individual.
 - **Monstruos para Saitama**: el primero aparece tras unos 22 segundos y los
   siguientes cada 45–90 segundos de actividad. Se acercan, Saitama conecta un
   único golpe y salen despedidos con gravedad y giro. También puedes usar
@@ -101,6 +114,7 @@ compilar desde una terminal **como administrador**.
 - `animation-geometry.js` — puntos de contacto de puños, patadas y rayos
 - `transformations.js` — orden, nombres y colores de las ocho parejas
 - `fusions.js` — Vegito, Gogeta, métodos de fusión y rivales
+- `energy-attacks.js` / `energy-art.js` — ataques por personaje, ráfagas, cargas y efectos Canvas
 - `battle-engine.js` — simulación independiente de vuelo y combate
 - `combat-controller.js` — ventanas de luchadores, ataques y encuentros
 - `combat.html` / `combat.js` / `combat-preload.js` — dibujo y controles del combate
@@ -108,13 +122,14 @@ compilar desde una terminal **como administrador**.
 
 ## Validación del cambio de combate
 
-`npm test` ejecuta veintisiete pruebas: vuelo en distintas distribuciones de monitores,
+`npm test` ejecuta treinta y una pruebas: vuelo en distintas distribuciones de monitores,
 modo tranquilo sin ataques, pantallas deshabilitadas, pausa y limpieza de ventanas,
 derrota del monstruo de un golpe, cancelación al arrastrar, controles del menú,
 secuencias de animación, Super Saiyan, orden de los ataques, alcance físico,
 recorrido del rayo, sincronización del fotograma de impacto, esquivas sin daño,
 progresión completa de transformaciones, carga segura de atlas al cambiar de modelo,
-rituales Potara y danza, enemigos, derrota, siguiente ronda y separación.
+rituales Potara y danza, enemigos, derrota, siguiente ronda, separación,
+alternancia Galick/Final Flash, cinco contactos de Broly sin duplicados y cancelación de ráfagas.
 
 La prueba de integración en Electron se ejecuta con
 `node node_modules/electron/cli.js tests/renderer-smoke.cjs`. Usa ventanas ocultas
@@ -130,6 +145,9 @@ extraídos de los dibujos se generan con
 Para validar los ocho enfrentamientos de las fusiones con el alcance de los dibujos
 reales y generar `fusions-preview.png`:
 `node node_modules/electron/cli.js tests/render-fusions.cjs`.
+La galería `energy-preview.png` muestra carga, disparo e impacto de los cinco ataques principales:
+`node node_modules/electron/cli.js tests/render-energy.cjs`. La integración comprueba
+también que los tres ataques de Goku y Vegeta pinten píxeles en la ventana real del rayo.
 
 La simulación comprueba monitores horizontales, verticales y separados; el ajuste
 visual en una configuración física con distintas escalas DPI debe comprobarse
@@ -161,3 +179,15 @@ Archivos del cambio:
 - `tests/transformations.test.js`, `tests/render-transformations.cjs`
 - `tests/fusions.test.js`, `tests/render-fusions.cjs`
 - `art-preview.png`, `choreography-preview.png`, `transformations-preview.png`, `fusions-preview.png`, `dist/WaifuPet-1.0.0.exe`
+
+## Mejora de ataques de energía y proporciones
+
+Commit propuesto: `[IMP] WaifuPet: Improve attacks and proportions`
+
+Archivos de esta mejora:
+
+- `README.md`, `anime-art.js`, `animation-geometry.js`, `fusions.js`, `battle-engine.js`, `combat-controller.js`, `combat.html`, `combat.js`
+- `energy-attacks.js`, `energy-art.js`, `index.html`, `package.json`, `pet.js`
+- `tests/energy-attacks.test.js`, `tests/render-energy.cjs`, `tests/renderer-smoke.cjs`, `energy-preview.png`
+- `tests/render-fusions.cjs`, `fusions-preview.png`
+- `dist/WaifuPet-1.0.0.exe`

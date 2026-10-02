@@ -2,6 +2,7 @@
 const geometry = require('./animation-geometry');
 const transformations = require('./transformations');
 const fusions = require('./fusions');
+const energyAttacks = require('./energy-attacks');
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const aSameDisplay = (fighters) => fighters[0].displayId === fighters[1].displayId;
@@ -13,6 +14,7 @@ class BattleEngine {
     this.time = 0; this.phase = 'travel'; this.age = 0; this.targetAge = 99;
     this.attacker = 0; this.attackCount = 0; this.action = 'punch';
     this.attackHit = false; this.hitStop = 0; this.beam = null;
+    this.energyAttack = 'kamehameha'; this.energyTurns = {};
     this.displayIndex = -1; this.initialized = false;
     this.fusion = null; this.fusionPlan = null; this.opponent = 'buu'; this.enemyHealth = 8; this.defeated = false;
     this.fighters = ['goku', 'vegeta'].map((kind, i) => ({ kind, x: 0, y: 0, vx: 0, vy: 0,
@@ -29,6 +31,7 @@ class BattleEngine {
     for (const f of this.fighters) {
       f.impact = 0; f.trail = []; f.pose = 'transform'; f.poseAge = 0; f.opacity = 1;
       delete f.artAtlas; delete f.artOffset; delete f.character; delete f.color; delete f.ritual; delete f.fusionProgress;
+      f.size = 1;
     }
     return true;
   }
@@ -49,6 +52,7 @@ class BattleEngine {
       f.trail = []; f.opacity = i ? 0 : .1; f.impact = 0; delete f.ritual;
       f.artAtlas = appearance.atlas; f.artOffset = appearance.offset; f.color = appearance.color;
       f.character = i ? this.opponent : this.fusion.hero; f.pose = i ? 'guard' : 'transform';
+      f.size = fusions.size(f.character);
       f.form = this.form; f.super = true; f.poseAge = 0; f.fusionProgress = 0;
     });
     this.changePhase('fusion-reveal');
@@ -77,6 +81,11 @@ class BattleEngine {
   changePhase(phase) {
     this.phase = phase; this.age = 0;
     if (phase === 'windup' || phase === 'charge') this.attackHit = false;
+    if (phase === 'charge') {
+      const f = this.fighters[this.attacker], character = f.character || f.kind;
+      const turn = this.energyTurns[character] || 0;
+      this.energyAttack = energyAttacks.select(character, turn); this.energyTurns[character] = turn + 1;
+    }
     if (phase === 'windup') {
       this.moveCount++;
       const instinct = ['omen-evolved', 'ui-ego'].includes(this.form) && this.attacker === 1;
@@ -105,8 +114,9 @@ class BattleEngine {
     const a = this.fighters[this.attacker], victim = this.fighters[1 - this.attacker];
     this.attackHit = true; this.hitStop = energy ? .09 : .065;
     victim.impact = energy ? .45 : .32; victim.hitAge = 0;
-    victim.contact = { x: (point.x - victim.x) / scale * victim.dir, y: (point.y - victim.y) / scale - 92 };
-    victim.vx += a.dir * (energy ? 540 : this.action === 'kick' ? 310 : 250) * scale;
+    const victimScale = scale * (victim.size || 1);
+    victim.contact = { x: (point.x - victim.x) / victimScale * victim.dir, y: (point.y - victim.y) / victimScale - 92 };
+    victim.vx += a.dir * (energy ? 390 + energyAttacks.get(this.energyAttack).width * 5 : this.action === 'kick' ? 310 : 250) * scale;
     victim.vy -= (energy ? 55 : 18) * scale;
     victim.pose = 'recoil'; victim.poseAge = 0;
     this.lastContact = { phase: this.phase, attacker: this.attacker, point: { ...point },
@@ -131,10 +141,11 @@ class BattleEngine {
     const hand = this.hand(this.fighters[this.attacker].kind);
     const energy = ['separate', 'charge', 'blast', 'retreat', 'transform'].includes(this.phase);
     const travel = this.mode === 'roam' || this.phase === 'travel';
-    const gap = (travel ? 245 : energy ? 365 : hand.x + 2) * scale;
+    const attackSize = this.fighters[this.attacker].size || 1, victimSize = this.fighters[1 - this.attacker].size || 1;
+    const gap = (travel ? 245 : energy ? 365 : hand.x * attackSize + 2) * scale;
     let x = this.target.x + (index ? 1 : -1) * gap / 2, y = this.target.y;
     if (travel) y += Math.sin(this.time * 1.3 + index * .8) * 12 * scale;
-    else if (!attacking) y += (hand.y - geometry.body.y) * scale;
+    else if (!attacking) y += ((92 + hand.y) * attackSize - (92 + geometry.body.y) * victimSize) * scale;
     if (this.phase === 'windup' && attacking) x -= this.fighters[index].dir * Math.sin(Math.PI * clamp(this.age / .38, 0, 1)) * 12 * scale;
     if (this.phase === 'strike' && attacking) x += this.fighters[index].dir * Math.min(1, this.age / .07) * 16 * scale;
     if (!attacking && this.willDodge && ((this.phase === 'windup' && this.age > .18) || this.phase === 'strike')) {
@@ -151,8 +162,9 @@ class BattleEngine {
       return !best || dist < best.distance ? { display: candidate, distance: dist } : best;
     }, null).display;
     const b = d.workArea;
-    const insets = { left: Math.min(95 * scale, b.width / 2), right: Math.min(95 * scale, b.width / 2),
-      top: Math.min(195 * scale, b.height / 2), bottom: Math.min(95 * scale, b.height / 2) };
+    const visualScale = scale * (f.size || 1);
+    const insets = { left: Math.min(95 * visualScale, b.width / 2), right: Math.min(95 * visualScale, b.width / 2),
+      top: Math.min(195 * visualScale, b.height / 2), bottom: Math.min(95 * visualScale, b.height / 2) };
     for (const other of displays) {
       if (other.id === d.id) continue;
       const o = other.workArea;
@@ -217,6 +229,9 @@ class BattleEngine {
         this.phase === 'windup' ? 'windup' : this.phase === 'strike' ? (this.action === 'kick' ? 'kick' : 'strike') :
           this.phase === 'recover' ? 'recover' : this.phase === 'charge' ? 'charge' : this.phase === 'blast' ? 'blast' : 'guard';
       f.action = this.action; f.progress = this.age; f.super = this.super; f.form = this.form;
+      f.energyAttack = i === this.attacker && ['charge', 'blast'].includes(this.phase) ? this.energyAttack : null;
+      f.chargeProgress = clamp(this.age / energyAttacks.get(this.energyAttack).charge, 0, 1);
+      f.energyHand = this.landmarks?.[f.kind]?.energy || geometry.hand(f.kind, 'energy', this.form);
       if (this.fusionPlan) {
         const ritual = this.fusionPlan.mode.ritual;
         f.ritual = this.phase === 'fusion-ritual' ? ritual : null;
@@ -228,6 +243,7 @@ class BattleEngine {
         const appearance = i ? fusions.enemy(this.opponent) : this.fusion;
         f.artAtlas = appearance.atlas; f.artOffset = appearance.offset; f.color = appearance.color;
         f.character = i ? this.opponent : this.fusion.hero; f.fusionProgress = 0;
+        f.size = fusions.size(f.character);
         if (this.phase === 'fusion-reveal') f.pose = i ? 'guard' : 'transform';
         if (this.phase === 'victory') {
           f.pose = i ? 'recoil' : 'guard';
@@ -287,23 +303,36 @@ class BattleEngine {
         else this.changePhase('approach');
       }
     } else if (this.phase === 'separate') {
-      if (this.age > .65 && this.fighters.every((f, i) => distance(f, this.targetFor(i, scale)) < 30 * scale)) this.changePhase('charge');
+      if (this.age > .65 && this.fighters.every((f, i) => distance(f, this.targetFor(i, scale)) < 30 * scale)) {
+        this.changePhase('charge'); events.push('charge');
+      }
     } else if (this.phase === 'charge') {
-      if (this.age >= 1.2) {
+      if (this.age >= energyAttacks.get(this.energyAttack).charge) {
         const start = this.actionPoint(a, scale), end = this.bodyPoint(victim, scale);
-        this.beam = { start, end, length: distance(start, end), progress: 0, age: 0, landed: false };
+        this.beam = { start, end, length: distance(start, end), progress: 0, age: 0, landed: false,
+          attack: this.energyAttack, contacts: [], impactPoints: {}, shots: [] };
+        a.vx -= a.dir * energyAttacks.get(this.energyAttack).width * 3 * scale;
         this.changePhase('blast'); events.push('blast');
       }
     } else if (this.phase === 'blast') {
       if (this.beam) {
         this.beam.age = this.age;
-        const travel = .14 + this.beam.length / (1600 * scale);
+        const profile = energyAttacks.get(this.energyAttack);
+        if (profile.count > 1) this.beam.end = this.bodyPoint(victim, scale);
+        const travel = .14 + this.beam.length / (profile.speed * scale);
         this.beam.progress = clamp(this.age / travel, 0, 1);
-        if (this.beam.progress >= 1 && !this.attackHit && a.displayId === victim.displayId &&
-          distance(this.beam.end, this.bodyPoint(victim, scale)) < 60 * scale) {
-          this.hit(this.beam.end, scale, events, true); this.beam.landed = true;
+        this.beam.shots = energyAttacks.sample(this.beam, this.age, scale);
+        for (const shot of this.beam.shots) {
+          if (shot.progress >= 1 && !this.beam.contacts.includes(shot.index) && a.displayId === victim.displayId &&
+            distance(this.beam.end, this.bodyPoint(victim, scale)) < 60 * scale) {
+            this.attackHit = false; this.hit(this.beam.end, scale, events, true);
+            this.beam.contacts.push(shot.index); this.beam.landed = true;
+            this.beam.impactPoints[shot.index] = { ...this.beam.end };
+          }
+          shot.landed = this.beam.contacts.includes(shot.index);
+          if (shot.landed) shot.target = this.beam.impactPoints[shot.index];
         }
-        if (this.age >= travel + .38) { this.beam = null; this.changePhase('retreat'); }
+        if (this.age >= travel + profile.hold + (profile.count - 1) * profile.interval) { this.beam = null; this.changePhase('retreat'); }
       }
     } else if (this.phase === 'retreat' && this.age >= .8) {
       this.levelRounds++;

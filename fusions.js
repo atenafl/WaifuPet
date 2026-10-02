@@ -12,7 +12,8 @@
   ];
   const get = (id) => modes.find((mode) => mode.id === id);
   const enemy = (id) => opponents.find((opponent) => opponent.id === id);
-  const catalog = { modes, opponents, get, enemy };
+  const size = (character) => character === 'broly' ? 1.2 : 1;
+  const catalog = { modes, opponents, get, enemy, size };
   if (typeof module !== 'undefined' && module.exports) module.exports = catalog;
   else window.Fusions = catalog;
 })();

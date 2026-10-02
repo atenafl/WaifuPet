@@ -90,7 +90,9 @@ window.AnimeArt = (() => {
       }
       const transformed = (window.Transformations.get(name).id === name && name !== 'base') || name.startsWith('fusion-');
       const heights = cells.map((cell) => cell.image.height).sort((a, b) => a - b);
-      atlases.set(name, { cells, height: transformed ? heights[8] : image.naturalHeight / 4 });
+      const characterHeights = name.startsWith('fusion-') && name !== 'fusion-ritual' ? [0, 8].map(offset =>
+        cells.slice(offset, offset + 8).map(cell => cell.image.height).sort((a, b) => a - b)[4]) : null;
+      atlases.set(name, { cells, height: transformed ? heights[8] : image.naturalHeight / 4, characterHeights });
       resolve(true);
     };
     image.onerror = () => { console.error('No se pudo cargar la animación: ' + name); resolve(false); };
@@ -103,7 +105,8 @@ window.AnimeArt = (() => {
   function landmarks(name, kind) {
     const atlas = atlases.get(name);
     if (!atlas) return null;
-    const offset = typeof kind === 'number' ? kind : kind === 'vegeta' ? 8 : 0, scale = 278 / atlas.height;
+    const offset = typeof kind === 'number' ? kind : kind === 'vegeta' ? 8 : 0,
+      scale = 278 / (atlas.characterHeights?.[Math.floor(offset / 8)] || atlas.height);
     const result = {};
     for (const [action, slot] of [['punch', 3], ['kick', 4], ['energy', 7]]) {
       const cell = atlas.cells[offset + slot];
@@ -118,11 +121,40 @@ window.AnimeArt = (() => {
     const cell = atlas.cells[kind === 'vegeta' ? 15 : 7], scale = 278 / atlas.height;
     return { x: (cell.tip.x - cell.anchor) * scale, y: (cell.tip.y - cell.foot) * scale };
   }
+  function chargePoint(p) {
+    const frame = window.AnimationFrames.fighter(p), atlas = atlases.get(frame.atlas);
+    if (!atlas) return { x: -32, y: -155 };
+    const cell = atlas.cells[frame.row * 4 + frame.column],
+      scale = 278 / (atlas.characterHeights?.[Math.floor(frame.row / 2)] || atlas.height);
+    if (!cell.chargePoint) {
+      const w = cell.image.width, h = cell.image.height, pixels = cell.image.getContext('2d').getImageData(0, 0, w, h).data;
+      const stride = w + 1, sums = new Int32Array(stride * (h + 1));
+      for (let y = 0; y < h; y++) {
+        let line = 0;
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          line += pixels[i + 3] > 180 && Math.min(pixels[i], pixels[i + 1], pixels[i + 2]) > 215 ? 1 : 0;
+          sums[(y + 1) * stride + x + 1] = sums[y * stride + x + 1] + line;
+        }
+      }
+      const r = Math.max(4, Math.round(h * .035));
+      let best = -1, point = { x: w * .35, y: h * .58 };
+      for (let y = Math.floor(h * .38); y < h * .76; y += 2) {
+        for (let x = Math.max(r, Math.floor(w * .08)); x < Math.min(w - r, w * .7); x += 2) {
+          const left = x - r, right = x + r, top = y - r, bottom = Math.min(h, y + r);
+          const score = sums[bottom * stride + right] - sums[top * stride + right] - sums[bottom * stride + left] + sums[top * stride + left];
+          if (score > best) { best = score; point = { x, y }; }
+        }
+      }
+      cell.chargePoint = point;
+    }
+    return { x: (cell.chargePoint.x - cell.anchor) * scale, y: (cell.chargePoint.y - cell.foot) * scale };
+  }
   function draw(g, frame, height) {
     const atlas = atlases.get(frame.atlas);
     if (!atlas) return false;
     const cell = atlas.cells[frame.row * 4 + frame.column];
-    const scale = height / atlas.height;
+    const scale = height / (atlas.characterHeights?.[Math.floor(frame.row / 2)] || atlas.height);
     g.save(); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
     g.drawImage(cell.image, -cell.anchor * scale, -cell.foot * scale,
       cell.image.width * scale, cell.image.height * scale);
@@ -153,5 +185,5 @@ window.AnimeArt = (() => {
     const success = draw(g, window.AnimationFrames.monster(p), 320);
     g.restore(); return success;
   }
-  return { ready, load, landmarks, ritualContact, draw, fighter, saitama, monster };
+  return { ready, load, landmarks, ritualContact, chargePoint, draw, fighter, saitama, monster };
 })();

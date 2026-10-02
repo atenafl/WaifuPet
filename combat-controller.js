@@ -1,6 +1,7 @@
 'use strict';
 const { BrowserWindow } = require('electron');
 const path = require('path');
+const energyAttacks = require('./energy-attacks');
 const { BattleEngine } = require('./battle-engine');
 const geometry = require('./animation-geometry');
 const transformations = require('./transformations');
@@ -129,15 +130,19 @@ class CombatController {
     const from = this.engine.fighters[this.engine.attacker];
     const shot = this.engine.beam;
     const start = this.engine.actionPoint(from, scale);
-    const end = { x: start.x + (shot.end.x - start.x) * shot.progress, y: start.y + (shot.end.y - start.y) * shot.progress };
-    const pad = 70 * scale;
-    const b = { x: Math.floor(Math.min(start.x, end.x) - pad), y: Math.floor(Math.min(start.y, end.y) - pad),
-      width: Math.ceil(Math.abs(end.x - start.x) + pad * 2), height: Math.ceil(Math.abs(end.y - start.y) + pad * 2) };
+    const end = shot.end;
+    const pad = (energyAttacks.get(shot.attack).impact * 1.4 + 55) * scale;
+    const points = [start, end, ...Object.values(shot.impactPoints)];
+    const xs = points.map(p => p.x), ys = points.map(p => p.y);
+    const b = { x: Math.floor(Math.min(...xs) - pad), y: Math.floor(Math.min(...ys) - pad),
+      width: Math.ceil(Math.max(...xs) - Math.min(...xs) + pad * 2), height: Math.ceil(Math.max(...ys) - Math.min(...ys) + pad * 2) };
     const beam = this.create('beam');
     if (!beam.combatReady) return;
     beam.setBounds(b);
     beam.webContents.send('battle-frame', { kind: 'beam', scale, time: this.engine.time,
-      start: { x: start.x - b.x, y: start.y - b.y }, end: { x: end.x - b.x, y: end.y - b.y },
+      start: { x: start.x - b.x, y: start.y - b.y }, target: { x: end.x - b.x, y: end.y - b.y },
+      attack: shot.attack, shots: shot.shots.map(s => ({ ...s,
+        target: s.target ? { x: s.target.x - b.x, y: s.target.y - b.y } : null })),
       landed: shot.landed, color: from.color || transformations.color(this.engine.form, from.kind) });
     if (!beam.isVisible()) beam.showInactive();
   }
@@ -162,12 +167,15 @@ class CombatController {
       const events = this.engine.update(dt, this.displays(), scale);
       for (const f of this.engine.fighters) {
         if (!this.engine.initialized) continue;
-        this.draw(f.kind, { ...f, phase: this.engine.phase, time: this.engine.time, super: this.engine.super }, f.x, f.y, scale);
+        this.draw(f.kind, { ...f, phase: this.engine.phase, time: this.engine.time, super: this.engine.super }, f.x, f.y, scale * (f.size || 1));
       }
       this.drawBeam(scale);
       if (events.includes('next-form')) this.transform(this.engine.requestedForm);
-      const audible = events.find((event) => event === 'hit' || event === 'blast');
-      if (audible && this.sound()) this.send('battle-sound:' + audible);
+      if (this.sound()) {
+        if (events.includes('charge')) this.send('battle-energy:charge:' + this.engine.energyAttack);
+        if (events.includes('blast')) this.send('battle-energy:blast:' + this.engine.energyAttack);
+        if (events.includes('hit')) this.send('battle-sound:hit');
+      }
       return;
     }
     if (this.model !== 'saitama' || !this.hero) return;

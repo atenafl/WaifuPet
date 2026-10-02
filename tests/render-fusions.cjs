@@ -53,7 +53,8 @@ app.whenReady().then(async () => {
         g.fillStyle='#1c2740';g.beginPath();g.roundRect(x,y,767,238,16);g.fill();
         g.fillStyle='#cbd9f4';g.font='18px sans-serif';g.fillText(s.title,x+18,y+28);
         for(const f of s.fighters){
-          g.save();g.translate(cx+(f.x-s.target.x)*scale,cy+(f.y-s.target.y+92)*scale);g.scale(f.dir*scale,scale);
+          const visualScale=scale*(f.size||1);
+          g.save();g.translate(cx+(f.x-s.target.x)*scale,cy+(f.y-s.target.y)*scale+92*visualScale);g.scale(f.dir*visualScale,visualScale);
           HeroArt.fighter(g,{...f,phase:s.phase,time:s.time});
           if(f.impact>0){g.strokeStyle='#fff0a3';g.lineWidth=3;g.beginPath();g.arc(f.contact.x,f.contact.y,18,0,Math.PI*2);g.stroke();}
           g.restore();

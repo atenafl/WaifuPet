@@ -745,6 +745,12 @@ function jump() {
 }
 
 function doAction(a) {
+  if (a.startsWith('battle-energy:')) {
+    const [, stage, attack] = a.split(':'), profile = window.EnergyAttacks.get(attack);
+    if (stage === 'charge') chargeSound(profile.charge, profile.width > 35);
+    else energySound(profile);
+    return;
+  }
   if (a.startsWith('battle-sound:')) { punchSound(a.endsWith('blast')); return; }
   if (a.startsWith('encounter-start:') && modelId === 'saitama') {
     encounter = true;
@@ -872,6 +878,32 @@ function punchSound(big) {
   og.connect(a.destination);
   o.start(t);
   o.stop(t + len);
+}
+
+function energySound(profile) {
+  if (!soundOn) return;
+  const a = getAudio(); if (!a) return;
+  const t = a.currentTime, duration = .65 + profile.hold + (profile.count - 1) * profile.interval;
+  const buffer = a.createBuffer(1, Math.ceil(a.sampleRate * duration), a.sampleRate), data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const noise = a.createBufferSource(), filter = a.createBiquadFilter(), gain = a.createGain();
+  noise.buffer = buffer; filter.type = 'bandpass'; filter.Q.value = .6;
+  filter.frequency.setValueAtTime(profile.style === 'spiral' ? 1200 : 650, t);
+  filter.frequency.exponentialRampToValueAtTime(180, t + duration);
+  gain.gain.setValueAtTime(.0001, t); gain.gain.exponentialRampToValueAtTime(.22, t + .045);
+  if (profile.count > 1) {
+    for (let i = 1; i < profile.count; i++) {
+      gain.gain.setValueAtTime(.08, t + i * profile.interval);
+      gain.gain.linearRampToValueAtTime(.28, t + i * profile.interval + .03);
+    }
+  }
+  gain.gain.exponentialRampToValueAtTime(.0001, t + duration);
+  noise.connect(filter); filter.connect(gain); gain.connect(a.destination); noise.start(t); noise.stop(t + duration);
+  const tone = a.createOscillator(), bass = a.createGain();
+  tone.type = 'sawtooth'; tone.frequency.setValueAtTime(profile.width > 40 ? 80 : 140, t);
+  tone.frequency.exponentialRampToValueAtTime(38, t + duration);
+  bass.gain.setValueAtTime(.07, t); bass.gain.exponentialRampToValueAtTime(.0001, t + duration);
+  tone.connect(bass); bass.connect(a.destination); tone.start(t); tone.stop(t + duration);
 }
 
 function chargeSound(sec, big) {

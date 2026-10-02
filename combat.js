@@ -13,20 +13,7 @@ function render() {
   if (!frame) return;
   const f = frame;
   if (f.kind === 'beam') {
-    const start = f.start, end = f.end;
-    g.lineCap = 'round'; g.shadowColor = f.color; g.shadowBlur = 22 * f.scale;
-    for (const [width, color] of [[35, f.color + '45'], [18, f.color], [8, '#f5ffff']]) {
-      g.strokeStyle = color; g.lineWidth = width * f.scale;
-      g.beginPath(); g.moveTo(start.x, start.y); g.lineTo(end.x, end.y); g.stroke();
-    }
-    g.shadowBlur = 0; g.fillStyle = '#edffff';
-    g.beginPath(); g.arc(end.x, end.y, (17 + Math.sin(f.time * 38) * 4) * f.scale, 0, Math.PI * 2); g.fill();
-    g.strokeStyle = f.color; g.lineWidth = 2 * f.scale;
-    for (let i = 0; i < (f.landed ? 9 : 0); i++) {
-      const a = i * .7 + f.time * 5;
-      g.beginPath(); g.moveTo(end.x + Math.cos(a) * 24 * f.scale, end.y + Math.sin(a) * 24 * f.scale);
-      g.lineTo(end.x + Math.cos(a) * 50 * f.scale, end.y + Math.sin(a) * 50 * f.scale); g.stroke();
-    }
+    window.EnergyArt.beam(g, f);
     return;
   }
   g.save(); g.translate(w / 2, h / 2 + 92 * f.scale); g.scale(f.scale, f.scale);
@@ -60,6 +47,11 @@ function render() {
     g.save(); g.scale(f.dir, 1); window.HeroArt.fighter(g, f);
     if (f.impact > 0) impact(g, f.hitAge || 0, color, f.contact);
     g.restore();
+    if (f.energyAttack && ['charge', 'blast'].includes(f.pose)) {
+      const hand = f.pose === 'charge' ? window.AnimeArt.chargePoint(f) : f.energyHand;
+      window.EnergyArt.charge(g, { x: hand.x * f.dir, y: hand.y }, f.energyAttack,
+        f.pose === 'charge' ? f.chargeProgress : 1, f.time, f.dir);
+    }
     if (f.pose === 'transform') {
       const pulse = Math.sin(Math.min(1, f.poseAge / 1.15) * Math.PI);
       g.strokeStyle = color; g.globalAlpha = pulse * .8; g.lineWidth = 4;

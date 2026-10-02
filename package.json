@@ -24,6 +24,8 @@
       "animation-frames.js",
       "transformations.js",
       "fusions.js",
+      "energy-attacks.js",
+      "energy-art.js",
       "animation-geometry.js",
       "battle-engine.js",
       "combat-controller.js",
