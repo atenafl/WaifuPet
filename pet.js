@@ -2,7 +2,7 @@
 
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
-const W = 340, H = 380;
+const W = 480, H = 380;
 const GROUND = H - 3;
 const HEAD_Y = -170;
 
@@ -23,6 +23,30 @@ const COL = {
   dark: '#332a5e'
 };
 
+const COL_BASE = Object.assign({}, COL);
+const MODEL_COL = {
+  tigresa: {
+    hair: '#d61f43',
+    hairDark: '#93122e',
+    hairLight: '#ff6b8a',
+    skin: '#f5a94e',
+    dress: '#1d1714',
+    dressSh: '#14100e',
+    trim: '#f07a2a',
+    inner: '#f7d9c4',
+    eye: '#ffc53d',
+    eyeSh: '#c97a12',
+    sock: '#221a17',
+    shoe: '#d8341a',
+    line: '#5a1a0e',
+    dark: '#3a140c'
+  }
+};
+
+function applyModelCol() {
+  Object.assign(COL, COL_BASE, MODEL_COL[modelId] || {});
+}
+
 const TAU = Math.PI * 2;
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -31,8 +55,8 @@ const pick = (arr) => arr[(Math.random() * arr.length) | 0];
 
 const api = window.petAPI;
 
-const MODELS = ['waifu', 'webillo'];
-const MODEL_NAME = { waifu: 'Waifu', webillo: 'Webillo' };
+const MODELS = ['webillo', 'tigresa'];
+const MODEL_NAME = { webillo: 'Webillo', tigresa: 'Tigresa' };
 let modelId = (() => {
   try {
     localStorage.removeItem('pet.model');
@@ -45,8 +69,9 @@ let modelId = (() => {
 function setModel(id) {
   if (MODELS.indexOf(id) < 0 || id === modelId) return;
   modelId = id;
+  applyModelCol();
   try {
-    localStorage.setItem('pet.model', id);
+    localStorage.setItem('pet.model', modelId);
   } catch (e) {}
   if (api.model) api.model(modelId);
   say('~ ' + MODEL_NAME[id] + ' ~');
@@ -55,7 +80,7 @@ function setModel(id) {
 const faceY = () => (modelId === 'webillo' ? -192 : HEAD_Y);
 
 const SIZE_IDS = ['small', 'normal', 'big'];
-const SIZE_MUL = { small: 0.39, normal: 0.5, big: 0.65 };
+const SIZE_MUL = { small: 0.78, normal: 1, big: 1.3 };
 const SIZE_NAME = { small: 'Pequeño', normal: 'Normal', big: 'Grande' };
 let sizeId = (() => {
   try {
@@ -169,6 +194,7 @@ const DUR = {
   spin: [2.6, 3.2],
   clap: [3.5, 5],
   peek: [4, 6],
+  fall: [2.2, 2.8],
   happy: [2.7, 2.7]
 };
 
@@ -190,6 +216,7 @@ const PH = {
   yawn: ['Bostezo...', '¡Ahhh~', 'Qué sueño me da'],
   shiver: ['¡Brrr!', 'Qué frío hace...', 'Dientes a temblar~'],
   sneeze: ['¡Achú!'],
+  fall: ['¡Ay!', 'Uf...', '¿Me has empujado?', '¡Ups!', '¡Auch!'],
   cheer: ['¡Sí, sí, sí!', '¡Vamos, vamos!', '¡Tú puedes!', '¡Eres genial!'],
   hop: ['¡Hop!', 'Saltando~', '¡Boing boing!'],
   spin: ['¡Gira, gira!', 'Giro de ballet~', '♪'],
@@ -618,7 +645,8 @@ function chooseNext() {
     ['hop', 0.05],
     ['spin', 0.04],
     ['clap', 0.05],
-    ['peek', 0.04]
+    ['peek', 0.04],
+    ['fall', 0.03]
   ];
   let total = 0;
   for (const e of table) total += e[1];
@@ -647,7 +675,7 @@ function jump() {
   vy = -560;
   squash = 0;
   spawnSparkles(4);
-  meow();
+  meow('short');
 }
 
 function doAction(a) {
@@ -659,15 +687,20 @@ function doAction(a) {
     case 'sound-off': soundOn = false; break;
     case 'model:waifu': setModel('waifu'); break;
     case 'model:webillo': setModel('webillo'); break;
+    case 'model:tigresa': setModel('tigresa'); break;
     case 'size:small': setSize('small'); break;
     case 'size:normal': setSize('normal'); break;
     case 'size:big': setSize('big'); break;
     case 'wake':
       setStateSay('idle');
       say(pick(PH.wake));
+      meow('low');
       break;
     default:
-      if (DUR[a]) setStateSay(a);
+      if (DUR[a]) {
+        setStateSay(a);
+        meow(ACT_SND[a] || 'meow');
+      }
   }
 }
 
@@ -684,36 +717,109 @@ function getAudio() {
   return ac;
 }
 
-function meow() {
+// Variantes de maullido: [frecuencia inicial, pico, final, duración, volumen]
+const MEOWS = {
+  short: [760, 1280, 880, 0.28, 0.12],
+  low: [420, 620, 330, 0.6, 0.13],
+  big: [600, 1350, 700, 0.7, 0.15],
+  chirp: [1150, 1750, 1300, 0.16, 0.1],
+  trip: [1050, 1500, 420, 0.4, 0.15],
+  meow: [640, 1150, 520, 0.5, 0.14]
+};
+
+// Sonido felín asociado a cada acción del menú.
+const ACT_SND = {
+  hop: 'short', jump: 'short', shiver: 'short', sneeze: 'short', peek: 'short',
+  yawn: 'low', sleep: 'low', wake: 'low', coffee: 'low', smoke: 'low',
+  cheer: 'big', dance: 'big', spin: 'big', clap: 'big', game: 'big', sing: 'big',
+  stretch: 'big', wave: 'big', happy: 'big',
+  read: 'purr', sit: 'purr',
+  phone: 'chirp', breakfast: 'chirp',
+  fall: 'trip', walk: 'meow'
+};
+
+function meow(kind) {
+  if (!soundOn) return;
+  const a = getAudio();
+  if (!a) return;
+  const t = a.currentTime;
+  if (kind === 'purr') {
+    const o = a.createOscillator();
+    o.type = 'triangle';
+    o.frequency.value = 132;
+    const lfo = a.createOscillator();
+    lfo.frequency.value = 27;
+    const lg = a.createGain();
+    lg.gain.value = 55;
+    lfo.connect(lg);
+    lg.connect(o.frequency);
+    const f = a.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = 650;
+    const g = a.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.09, t + 0.12);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+    o.connect(f);
+    f.connect(g);
+    g.connect(a.destination);
+    lfo.start(t);
+    lfo.stop(t + 1.45);
+    o.start(t);
+    o.stop(t + 1.45);
+    return;
+  }
+  const P = MEOWS[kind] || MEOWS.meow;
+  const f0 = P[0], f1 = P[1], f2 = P[2], dur = P[3], vol = P[4];
+  const o = a.createOscillator();
+  const g = a.createGain();
+  const f = a.createBiquadFilter();
+  o.type = 'sawtooth';
+  o.frequency.setValueAtTime(f0, t);
+  o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.18);
+  o.frequency.exponentialRampToValueAtTime(f2, t + dur * 0.84);
+  f.type = 'lowpass';
+  f.frequency.value = 2100;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + dur * 0.1);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  const lfo = a.createOscillator();
+  const lg = a.createGain();
+  lfo.frequency.value = kind === 'low' ? 24 : 15;
+  lg.gain.value = kind === 'low' ? 40 : 28;
+  lfo.connect(lg);
+  lg.connect(o.frequency);
+  lfo.start(t);
+  lfo.stop(t + dur + 0.02);
+  o.connect(f);
+  f.connect(g);
+  g.connect(a.destination);
+  o.start(t);
+  o.stop(t + dur + 0.02);
+}
+
+// Golpe seco al caer/tocar el suelo.
+function playThud() {
   if (!soundOn) return;
   const a = getAudio();
   if (!a) return;
   const t = a.currentTime;
   const o = a.createOscillator();
-  const g = a.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(130, t);
+  o.frequency.exponentialRampToValueAtTime(45, t + 0.14);
   const f = a.createBiquadFilter();
-  o.type = 'sawtooth';
-  o.frequency.setValueAtTime(640, t);
-  o.frequency.exponentialRampToValueAtTime(1150, t + 0.09);
-  o.frequency.exponentialRampToValueAtTime(520, t + 0.42);
   f.type = 'lowpass';
-  f.frequency.value = 2100;
+  f.frequency.value = 420;
+  const g = a.createGain();
   g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(0.14, t + 0.05);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
-  const lfo = a.createOscillator();
-  const lg = a.createGain();
-  lfo.frequency.value = 15;
-  lg.gain.value = 28;
-  lfo.connect(lg);
-  lg.connect(o.frequency);
-  lfo.start(t);
-  lfo.stop(t + 0.52);
+  g.gain.exponentialRampToValueAtTime(0.2, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
   o.connect(f);
   f.connect(g);
   g.connect(a.destination);
   o.start(t);
-  o.stop(t + 0.52);
+  o.stop(t + 0.2);
 }
 
 function hit(x, y) {
@@ -1276,9 +1382,12 @@ function update(dt) {
           squash = clamp(impact / 1000, 0.25, 1);
           if (impact > 400) spawnRing();
           if (impact > 700) spawnDust();
+          if (impact > 400) playThud();
+          if (impact > 900) meow('short');
           if (impact > 1150) {
             say(pick(PH.surprise));
             spawnBang();
+            meow('trip');
           }
         }
         applyMove();
@@ -1422,6 +1531,18 @@ function update(dt) {
         case 'peek':
           if (Math.random() < dt * 0.04) say(pick(PH.peek));
           break;
+        case 'fall': {
+          if (!stateFired && st >= dur * 0.4) {
+            stateFired = true;
+            squash = 0.85;
+            spawnRing();
+            spawnDust();
+            playThud();
+            meow('trip');
+            say(pick(PH.fall));
+          }
+          break;
+        }
       }
 
       if (state === 'smoke') {
@@ -1544,7 +1665,7 @@ function drawShadow(a) {
   const k = clamp(1 - up / 180, 0.35, 1);
   ctx.save();
   ctx.globalAlpha = (modelId === 'webillo' ? 0.24 : 0.2) * k;
-  ctx.fillStyle = modelId === 'webillo' ? '#17383b' : '#3a2c66';
+  ctx.fillStyle = modelId === 'webillo' ? '#17383b' : modelId === 'tigresa' ? '#5a2410' : '#3a2c66';
   ctx.beginPath();
   ctx.ellipse(W / 2 - (modelId === 'webillo' ? 15 : 0), GROUND + up - 1, (modelId === 'webillo' ? 66 : 40) * k, (modelId === 'webillo' ? 8 : 6.5) * k, 0, 0, TAU);
   ctx.fill();
@@ -1556,6 +1677,7 @@ function drawTail(t) {
   const puff = state === 'shiver' ? 1.35 : 1;
   const sw = Math.sin(t * fast);
   const curled = pose().legs === 'curl';
+  const tiger = modelId === 'tigresa';
   ctx.lineCap = 'round';
   let ex, ey;
   ctx.beginPath();
@@ -1570,16 +1692,54 @@ function drawTail(t) {
     ey = -108 + Math.cos(t * fast * 0.7) * 10;
   }
   ctx.strokeStyle = COL.line;
-  ctx.lineWidth = 17 * puff;
+  ctx.lineWidth = (tiger ? 27 : 17) * puff;
   ctx.stroke();
-  ctx.strokeStyle = COL.hair;
-  ctx.lineWidth = 13 * puff;
+  ctx.strokeStyle = tiger ? '#f5a94e' : COL.hair;
+  ctx.lineWidth = (tiger ? 22 : 13) * puff;
   ctx.stroke();
-  ell(ex, ey, 10 * puff, 10 * puff, COL.hair, 2.2);
-  ell(ex, ey, 5, 5, COL.hairLight, 0);
+  if (tiger) {
+    // Rayas de tigre: anillos negros bien marcados a lo largo de la cola.
+    ctx.save();
+    ctx.setLineDash([15 * puff, 16 * puff]);
+    ctx.strokeStyle = '#1c1512';
+    ctx.lineWidth = 22 * puff;
+    ctx.stroke();
+    ctx.restore();
+  }
+  ell(ex, ey, (tiger ? 13 : 10) * puff, (tiger ? 13 : 10) * puff, tiger ? '#1c1512' : COL.hair, 2.2);
+  ell(ex, ey, 6, 6, tiger ? '#f7d9c4' : COL.hairLight, 0);
 }
 
 function drawBackHair() {
+  if (modelId === 'tigresa') {
+    // Melena larga y ondulada hasta casi tocar el suelo.
+    ctx.beginPath();
+    ctx.moveTo(-46, -168);
+    ctx.quadraticCurveTo(-78, -104, -66, -46);
+    ctx.quadraticCurveTo(-60, -12, -46, 4);
+    ctx.quadraticCurveTo(-42, -24, -18, -20);
+    ctx.quadraticCurveTo(0, -16, 18, -20);
+    ctx.quadraticCurveTo(42, -24, 46, 4);
+    ctx.quadraticCurveTo(60, -12, 66, -46);
+    ctx.quadraticCurveTo(78, -104, 46, -168);
+    ctx.quadraticCurveTo(0, -186, -46, -168);
+    ctx.closePath();
+    fillStroke(COL.hairDark, 2.4);
+    // Mechones claros.
+    ctx.save();
+    ctx.globalAlpha = 0.45;
+    ctx.strokeStyle = COL.hair;
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-52, -150);
+    ctx.quadraticCurveTo(-64, -96, -56, -52);
+    ctx.moveTo(52, -150);
+    ctx.quadraticCurveTo(64, -96, 56, -52);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
   ctx.beginPath();
   ctx.moveTo(-40, -168);
   ctx.quadraticCurveTo(-66, -110, -50, -64);
@@ -1624,17 +1784,20 @@ function drawLegs(t, mode) {
     if (mode === 'curl') {
       limb(hipx, -46, kx, ky, (hipx + kx) / 2 + 4 * s, -56, COL.skin, 14, 10.5);
       limb(kx, ky, fx, fy, kx + 2 * s, (ky + fy) / 2 + 3, COL.skin, 13, 9.5);
+      if (modelId === 'tigresa') limbStripes(hipx, -46, kx, ky, 2);
     } else {
       const cx = (hipx + fx) / 2 + (mode === 'sit' || mode === 'curl' ? 5 * s : 0);
       const cy = (-46 + fy) / 2 + (mode === 'sit' ? 6 : 0);
       limb(hipx, -46, fx, fy, cx, cy, COL.skin, 13, 9.5);
+      if (modelId === 'tigresa') limbStripes(hipx, -46, fx, fy, 3);
     }
 
-    // sock
+    // sock (Tigresa: liga completa desde el muslo hasta los pies)
     const sockY = mode === 'sit' ? -32 : mode === 'curl' ? -34 : mode === 'dangle' ? -16 : -18;
     if (mode !== 'curl') {
-      const mx = hipx + (fx - hipx) * 0.55;
-      const my = -46 + (fy + 46) * 0.55;
+      const down = modelId === 'tigresa' ? 0.06 : 0.55;
+      const mx = hipx + (fx - hipx) * down;
+      const my = -46 + (fy + 46) * down;
       limb(mx, my, fx, fy, cx2(mx, fx), my + (fy - my) * 0.5, COL.sock, 11.6, 9);
     }
     // shoe
@@ -1695,6 +1858,116 @@ function drawDress(t) {
   ctx.ellipse(15, -78, 8, 24, 0.1, 0, TAU);
   ctx.fill();
   ctx.restore();
+}
+
+// Cuerpo de Tigresa: cintura de reloj de arena, halter negro con escote en V,
+// ombligo visible y micro-short de rayas de tigre.
+function drawTigresaBody(t) {
+  // --- Torso (piel) ---
+  ctx.beginPath();
+  ctx.moveTo(-13, -119);
+  ctx.quadraticCurveTo(-20, -112, -19, -101);
+  ctx.quadraticCurveTo(-17, -93, -10, -87);
+  ctx.quadraticCurveTo(-20, -74, -25, -60);
+  ctx.quadraticCurveTo(-26, -50, -25, -44);
+  ctx.lineTo(25, -44);
+  ctx.quadraticCurveTo(26, -50, 25, -60);
+  ctx.quadraticCurveTo(20, -74, 10, -87);
+  ctx.quadraticCurveTo(17, -93, 19, -101);
+  ctx.quadraticCurveTo(20, -112, 13, -119);
+  ctx.quadraticCurveTo(0, -113, -13, -119);
+  ctx.closePath();
+  fillStroke(COL.skin, 2.4);
+
+  // --- Top halter negro (escote en V) ---
+  ctx.beginPath();
+  ctx.moveTo(-13, -118);
+  ctx.quadraticCurveTo(-21, -110, -19, -100);
+  ctx.quadraticCurveTo(-18, -92, -10, -90);
+  ctx.quadraticCurveTo(0, -88, 10, -90);
+  ctx.quadraticCurveTo(18, -92, 19, -100);
+  ctx.quadraticCurveTo(21, -110, 13, -118);
+  ctx.quadraticCurveTo(5, -110, 0, -100);
+  ctx.quadraticCurveTo(-5, -110, -13, -118);
+  ctx.closePath();
+  fillStroke(COL.dress, 2.4);
+  // Escote (línea de cleavage)
+  ctx.beginPath();
+  ctx.moveTo(0, -100);
+  ctx.quadraticCurveTo(1.6, -96, 0, -92);
+  ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+  // Sombra bajo el busto
+  ctx.beginPath();
+  ctx.moveTo(-9, -91);
+  ctx.quadraticCurveTo(0, -86.5, 9, -91);
+  ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  // Tirantes del halter hacia el cuello
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(9 * s, -117);
+    ctx.lineTo(4.5 * s, -127);
+    ctx.strokeStyle = COL.dress;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+  }
+
+  // --- Pelaje de tigre en el torso ---
+  // Panza crema (como la del vientre de un tigre).
+  ctx.beginPath();
+  ctx.ellipse(0, -85, 9, 7, 0, 0, TAU);
+  ctx.fillStyle = '#ffe9d2';
+  ctx.fill();
+  // Ombligo
+  ell(0, -85, 1.7, 2.2, 'rgba(90,40,10,0.55)', 0);
+  // Rayas en los flancos del vientre.
+  ctx.strokeStyle = '#1c1512';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 2.6;
+  ctx.beginPath();
+  ctx.moveTo(11, -86.5); ctx.quadraticCurveTo(14, -85, 17, -86.5);
+  ctx.moveTo(11, -82); ctx.quadraticCurveTo(14, -80.5, 17, -82);
+  ctx.moveTo(-11, -86.5); ctx.quadraticCurveTo(-14, -85, -17, -86.5);
+  ctx.moveTo(-11, -82); ctx.quadraticCurveTo(-14, -80.5, -17, -82);
+  ctx.stroke();
+
+  // --- Falda negra (llevada la última, encima del pelaje) ---
+  const skirt = () => {
+    ctx.beginPath();
+    ctx.moveTo(-13, -78);
+    ctx.quadraticCurveTo(0, -81, 13, -78);
+    ctx.quadraticCurveTo(27, -73, 31, -48);
+    ctx.quadraticCurveTo(16, -41, 0, -40);
+    ctx.quadraticCurveTo(-16, -41, -31, -48);
+    ctx.quadraticCurveTo(-27, -73, -13, -78);
+    ctx.closePath();
+  };
+  skirt();
+  fillStroke(COL.dress, 2.4);
+  // Pliegues
+  ctx.save();
+  skirt();
+  ctx.clip();
+  ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-7, -77); ctx.quadraticCurveTo(-9, -58, -11, -43);
+  ctx.moveTo(7, -77); ctx.quadraticCurveTo(9, -58, 11, -43);
+  ctx.moveTo(0, -78); ctx.lineTo(0, -41);
+  ctx.stroke();
+  ctx.restore();
+  // Cintura
+  ctx.beginPath();
+  ctx.moveTo(-13, -78);
+  ctx.quadraticCurveTo(0, -81, 13, -78);
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 3.5;
+  ctx.stroke();
 }
 
 function armConfig(pz, t) {
@@ -1764,6 +2037,31 @@ function armConfig(pz, t) {
   }
 }
 
+// Rayas de tigre transversales sobre un miembro (brazo/pierna).
+function limbStripes(x0, y0, x1, y1, n) {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const len = Math.hypot(dx, dy);
+  if (len < 6) return;
+  const nx = -dy / len;
+  const ny = dx / len;
+  ctx.save();
+  ctx.strokeStyle = '#1c1512';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 2.6;
+  for (let i = 1; i <= n; i++) {
+    const t = (i / (n + 1)) * 0.7 + 0.12;
+    const px = x0 + dx * t;
+    const py = y0 + dy * t;
+    const w = 5 + t * 3;
+    ctx.beginPath();
+    ctx.moveTo(px - nx * w, py - ny * w);
+    ctx.quadraticCurveTo(px + dx * 0.07, py + dy * 0.07, px + nx * w, py + ny * w);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawArm(a) {
   const s = a.sign;
   const sx = 17 * s;
@@ -1771,12 +2069,18 @@ function drawArm(a) {
   const ex = (sx + a.hx) / 2 + 8 * s;
   const ey = (sy + a.hy) / 2 + 4;
   limb(sx, sy, a.hx, a.hy, ex, ey, COL.skin, 12.6, 9);
+  if (modelId === 'tigresa') limbStripes(sx, sy, a.hx, a.hy, 2);
   ell(a.hx, a.hy, 6.5, 6.5, COL.skin, 2);
-  ell(sx, sy + 2, 9, 9, COL.dress, 2.2);
+  ell(sx, sy + 2, 9, 9, modelId === 'tigresa' ? COL.skin : COL.dress, 2.2);
 }
 
 function drawNeck() {
   ell(0, -124, 6.5, 8, COL.skin, 2);
+  if (modelId === 'tigresa') {
+    // Collar negro con campana.
+    rrect(-7.5, -125, 15, 6, 3, '#1d1714', 1.6, '#000000');
+    ell(0, -117.5, 3.6, 3.6, '#ffd76a', 1.5);
+  }
 }
 
 function drawEar(mirror) {
@@ -1801,6 +2105,18 @@ function drawEar(mirror) {
 function drawSideLock(mirror) {
   ctx.save();
   if (mirror) ctx.scale(-1, 1);
+  if (modelId === 'tigresa') {
+    // Mechón largo cayendo delante del hombro.
+    ctx.beginPath();
+    ctx.moveTo(-34, -36);
+    ctx.quadraticCurveTo(-57, -2, -49, 42);
+    ctx.quadraticCurveTo(-45, 62, -33, 51);
+    ctx.quadraticCurveTo(-42, 14, -29, -25);
+    ctx.closePath();
+    fillStroke(COL.hair, 2.2);
+    ctx.restore();
+    return;
+  }
   ctx.beginPath();
   ctx.moveTo(-34, -36);
   ctx.quadraticCurveTo(-51, -6, -44, 16);
@@ -1812,6 +2128,32 @@ function drawSideLock(mirror) {
 }
 
 function drawBangs() {
+  if (modelId === 'tigresa') {
+    // Flequillo lateral despeinado, puntas sesgadas hacia la derecha.
+    ctx.beginPath();
+    ctx.moveTo(-46, -6);
+    ctx.quadraticCurveTo(-36, -58, 12, -57);
+    ctx.quadraticCurveTo(44, -55, 46, -12);
+    ctx.quadraticCurveTo(41, 6, 35, -9);
+    ctx.quadraticCurveTo(29, 13, 23, -11);
+    ctx.quadraticCurveTo(15, 11, 7, -13);
+    ctx.quadraticCurveTo(-1, 9, -11, -13);
+    ctx.quadraticCurveTo(-21, 7, -31, -11);
+    ctx.quadraticCurveTo(-39, 4, -46, -6);
+    ctx.closePath();
+    fillStroke(COL.hair, 2.4);
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = COL.hairLight;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-28, -34);
+    ctx.quadraticCurveTo(-4, -50, 20, -44);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
   ctx.beginPath();
   ctx.moveTo(-44, -10);
   ctx.quadraticCurveTo(0, -56, 44, -10);
@@ -1845,6 +2187,76 @@ function drawAhoge() {
   ctx.quadraticCurveTo(2, -64, 4, -46);
   ctx.closePath();
   fillStroke(COL.hair, 2.2);
+}
+
+// Orejas de tigre (las redonditas de siempre). Se dibujan ANTES del pelo
+// grande: la base queda oculta dentro de la melena y solo asoman las puntas.
+function drawTigerEars() {
+  for (const s of [-1, 1]) {
+    ctx.save();
+    ctx.scale(s, 1);
+    ctx.beginPath();
+    ctx.moveTo(-34, -30);
+    ctx.quadraticCurveTo(-54, -70, -30, -86);
+    ctx.quadraticCurveTo(-13, -70, -14, -44);
+    ctx.closePath();
+    fillStroke(COL.hair, 2.4);
+    ctx.beginPath();
+    ctx.moveTo(-29, -38);
+    ctx.quadraticCurveTo(-45, -66, -29, -77);
+    ctx.quadraticCurveTo(-20, -62, -19, -47);
+    ctx.closePath();
+    ctx.fillStyle = '#f7d9c4';
+    ctx.fill();
+    ctx.strokeStyle = '#1c1512';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 3.2;
+    ctx.beginPath();
+    ctx.moveTo(-45, -56);
+    ctx.quadraticCurveTo(-39, -60, -33, -58);
+    ctx.moveTo(-41, -68);
+    ctx.quadraticCurveTo(-36, -71, -31, -69);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// Rasgos felinos de la cara: nariz de tigre, rayas en las mejillas y bigotes.
+function drawTigerFace() {
+  // Nariz
+  ctx.beginPath();
+  ctx.moveTo(-3, 21);
+  ctx.lineTo(3, 21);
+  ctx.lineTo(0, 25.5);
+  ctx.closePath();
+  ctx.fillStyle = '#c9563f';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(60,20,10,0.7)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // Rayas en las mejillas
+  ctx.save();
+  ctx.strokeStyle = '#1c1512';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 2.4;
+  for (const s of [-1, 1]) {
+    ctx.save();
+    ctx.scale(s, 1);
+    ctx.beginPath();
+    ctx.moveTo(27, 15); ctx.quadraticCurveTo(33, 17, 37, 14.5);
+    ctx.moveTo(29, 22); ctx.quadraticCurveTo(34, 24, 37, 21.5);
+    ctx.moveTo(26, 29); ctx.quadraticCurveTo(29.5, 31, 32, 29);
+    ctx.stroke();
+    // Bigotes blancos
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(10, 28.5); ctx.quadraticCurveTo(22, 27, 32, 26);
+    ctx.moveTo(10, 31.5); ctx.quadraticCurveTo(22, 31, 31, 30.5);
+    ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
 }
 
 function eyeMode() {
@@ -2057,10 +2469,17 @@ function drawHead(t, pz) {
   drawSideLock(false);
   drawSideLock(true);
 
+  // Las orejas de tigre van DETRÁS del pelo: la base queda oculta y solo
+  // asoman las puntas (si no, parecen una diadema encima de la cabeza).
+  if (modelId === 'tigresa') drawTigerEars();
+
   ell(0, -2, 46, 46, COL.hair, 2.4);
 
-  drawEar(false);
-  drawEar(true);
+  // Tigresa no lleva orejas humanas: solo las de tigre.
+  if (modelId !== 'tigresa') {
+    drawEar(false);
+    drawEar(true);
+  }
 
   ell(0, 7, 40, 41, COL.skin, 2.4);
 
@@ -2071,7 +2490,7 @@ function drawHead(t, pz) {
   const bAlpha = state === 'happy' || drag ? 0.85 : 0.5;
   ctx.save();
   ctx.globalAlpha = bAlpha;
-  ctx.fillStyle = '#ff8fae';
+  ctx.fillStyle = modelId === 'tigresa' ? '#e8623f' : '#ff8fae';
   ctx.beginPath();
   ctx.ellipse(-26, 24, 8.5, 5, 0, 0, TAU);
   ctx.fill();
@@ -2079,6 +2498,8 @@ function drawHead(t, pz) {
   ctx.ellipse(26, 24, 8.5, 5, 0, 0, TAU);
   ctx.fill();
   ctx.restore();
+
+  if (modelId === 'tigresa') drawTigerFace();
 
   drawEye(-1);
   drawEye(1);
@@ -2306,6 +2727,12 @@ function drawScene(dt) {
     ctx.rotate((st / dur) * TAU);
     ctx.translate(0, 110);
   }
+  if (state === 'fall' && !drag) {
+    const p = clamp(st / dur, 0, 1);
+    const k = p < 0.4 ? p / 0.4 : p < 0.65 ? 1 : 1 - (p - 0.65) / 0.35;
+    ctx.translate(-45 * k, 0);
+    ctx.rotate(k * 1.3);
+  }
 
   if (modelId === 'webillo') {
     drawWebillo(time, pz);
@@ -2313,7 +2740,8 @@ function drawScene(dt) {
     drawTail(time);
     drawBackHair();
     drawLegs(time, pz.legs);
-    drawDress(time);
+    if (modelId === 'tigresa') drawTigresaBody(time);
+    else drawDress(time);
     for (const ar of armConfig(pz, time)) drawArm(ar);
     drawNeck();
     drawHead(time, pz);

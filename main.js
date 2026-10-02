@@ -3,19 +3,19 @@ const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
 
-const W = 170;
+const W = 240;
 const H = 190;
 
 let win = null;
 let paused = false;
 let sound = true;
-let model = 'waifu';
+let model = 'webillo';
 let sizeId = 'normal';
 const SIZES = ['small', 'normal', 'big'];
 let disabled = new Set();
 
 function setModel(m) {
-  if (m !== 'waifu' && m !== 'webillo') return;
+  if (m !== 'webillo' && m !== 'tigresa') return;
   model = m;
   send('model:' + m);
 }
@@ -189,6 +189,7 @@ function showMenu() {
         { label: 'Girar sobre sí misma', click: () => send('spin') },
         { label: 'Aplaudir', click: () => send('clap') },
         { label: 'Taparse los ojos', click: () => send('peek') },
+        { label: 'Caerse', click: () => send('fall') },
         { label: 'Despertar', click: () => send('wake') }
       ]
     },
@@ -196,8 +197,8 @@ function showMenu() {
     {
       label: 'Modelo',
       submenu: [
-        { label: 'Waifu', type: 'radio', checked: model === 'waifu', click: () => setModel('waifu') },
-        { label: 'Webillo', type: 'radio', checked: model === 'webillo', click: () => setModel('webillo') }
+        { label: 'Webillo', type: 'radio', checked: model === 'webillo', click: () => setModel('webillo') },
+        { label: 'Tigresa', type: 'radio', checked: model === 'tigresa', click: () => setModel('tigresa') }
       ]
     },
     {
@@ -297,7 +298,7 @@ ipcMain.handle('pet-info', async () => {
 ipcMain.on('pet-menu', showMenu);
 
 ipcMain.on('pet-model', (_e, m) => {
-  if (m === 'waifu' || m === 'webillo') model = m;
+  if (m === 'webillo' || m === 'tigresa') model = m;
 });
 
 ipcMain.on('pet-sizemul', (_e, id) => {
