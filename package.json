@@ -24,6 +24,8 @@
       "animation-frames.js",
       "transformations.js",
       "fusions.js",
+      "titans.js",
+      "titan-engine.js",
       "energy-attacks.js",
       "energy-art.js",
       "animation-geometry.js",

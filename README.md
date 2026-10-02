@@ -26,8 +26,9 @@ Electron + Canvas (sin frameworks).
 - **Multipantalla real**: tamaño visual constante (en cm) en todos los
   monitores vía corrección EDID, transición gradual al cruzar de pantalla,
   sin saltos ni vibración; el suelo se adapta a cada monitor.
-- **Cuatro modelos**: waifu (canvas vectorial), webillo (pixel art), Saitama
-  (animación anime por fotogramas completos) y Goku y Vegeta juntos.
+- **Modelos**: waifu (canvas vectorial), webillo (pixel art), Saitama
+  (animación anime por fotogramas completos), Goku y Vegeta juntos,
+  y Eren, Armin y Reiner de Attack on Titan, por separado o los tres juntos.
   Saitama además da
   puñetazos (normal, consecutivos y serio, con onda de choque) y va a la
   compra con su bolsa. El puñetazo pedido desde el menú sacude todo el
@@ -80,6 +81,24 @@ Electron + Canvas (sin frameworks).
   **Hacer cosas → Invocar un monstruo**. Pausar congela los combates; arrastrar
   a Saitama cancela el encuentro; cambiar de modelo retira los personajes del
   combate anterior. El modelo y el tamaño elegidos se recuerdan al abrir la app.
+- **Attack on Titan**: Eren se convierte en Titán de Ataque, Armin en Colosal
+  y Reiner en Acorazado. Clic derecho → **Modelo** permite elegir uno o **Attack
+  on Titan · Los tres**. En **Titanes y movimiento** puedes caminar, correr,
+  quedarte quieto o alternar los movimientos automáticamente, transformar a cada
+  personaje o a todos, volver a humano y activar las transformaciones automáticas.
+  Empiezan como humanos y las primeras transformaciones se escalonan a los 8,
+  14 y 20 segundos. El cambio tiene preparación, destello, relámpagos, crecimiento
+  y vapor; cada forma usa dibujos completos distintos para caminar, correr,
+  reposo y transformación. El Colosal es el mayor de los tres, emite vapor y
+  los titanes levantan polvo al pisar. Caminan sobre el suelo de cada monitor:
+  pasan a monitores contiguos y reaparecen con un fundido en pantallas verticales
+  o separadas. Pausa, tamaños y pantallas deshabilitadas también se respetan.
+  El Titán de Ataque lleva una cobertura en la cintura. El Colosal usa un nuevo
+  atlas con proporciones altas y delgadas, brazos largos, cabeza pequeña y un
+  traje completo rojo mate con líneas de fibras y tendones impresas. Sustituye
+  el dibujo anterior de hombros y piernas voluminosos. Es una adaptación cubierta;
+  la versión sin traje fue bloqueada por ImageGen. Las pruebas verifican la carga
+  y el funcionamiento de los fotogramas, no la fidelidad exacta al anime.
 - **Animaciones**: paseo, baile, sueño, café, lectura, teléfono, cigarrillo,
   desayuno, canto, videojuego, estirarse, saludar, bostezar, tiritar,
   estornudar, animarse con confeti, saltos de conejo, girar, aplaudir,
@@ -115,6 +134,7 @@ compilar desde una terminal **como administrador**.
 - `transformations.js` — orden, nombres y colores de las ocho parejas
 - `fusions.js` — Vegito, Gogeta, métodos de fusión y rivales
 - `energy-attacks.js` / `energy-art.js` — ataques por personaje, ráfagas, cargas y efectos Canvas
+- `titans.js` / `titan-engine.js` — personajes, secuencias de animación, transformación y movimiento sobre el suelo
 - `battle-engine.js` — simulación independiente de vuelo y combate
 - `combat-controller.js` — ventanas de luchadores, ataques y encuentros
 - `combat.html` / `combat.js` / `combat-preload.js` — dibujo y controles del combate
@@ -122,7 +142,7 @@ compilar desde una terminal **como administrador**.
 
 ## Validación del cambio de combate
 
-`npm test` ejecuta treinta y una pruebas: vuelo en distintas distribuciones de monitores,
+`npm test` ejecuta treinta y seis pruebas: vuelo en distintas distribuciones de monitores,
 modo tranquilo sin ataques, pantallas deshabilitadas, pausa y limpieza de ventanas,
 derrota del monstruo de un golpe, cancelación al arrastrar, controles del menú,
 secuencias de animación, Super Saiyan, orden de los ataques, alcance físico,
@@ -130,6 +150,8 @@ recorrido del rayo, sincronización del fotograma de impacto, esquivas sin daño
 progresión completa de transformaciones, carga segura de atlas al cambiar de modelo,
 rituales Potara y danza, enemigos, derrota, siguiente ronda, separación,
 alternancia Galick/Final Flash, cinco contactos de Broly sin duplicados y cancelación de ráfagas.
+También valida las seis formas de Attack on Titan, transformación individual,
+caminar/correr, suelo, monitores verticales, controles, pausa y limpieza de sus ventanas.
 
 La prueba de integración en Electron se ejecuta con
 `node node_modules/electron/cli.js tests/renderer-smoke.cjs`. Usa ventanas ocultas
@@ -148,6 +170,10 @@ reales y generar `fusions-preview.png`:
 La galería `energy-preview.png` muestra carga, disparo e impacto de los cinco ataques principales:
 `node node_modules/electron/cli.js tests/render-energy.cjs`. La integración comprueba
 también que los tres ataques de Goku y Vegeta pinten píxeles en la ventana real del rayo.
+La galería `titans-preview.png` verifica los seis atlas transparentes y 24 poses:
+`node node_modules/electron/cli.js tests/render-titans.cjs`. La integración de Electron
+comprueba las tres ventanas, sus transformaciones, el regreso individual a humano,
+el modelo de un solo personaje y el cierre de todas las ventanas al cambiar de modelo.
 
 La simulación comprueba monitores horizontales, verticales y separados; el ajuste
 visual en una configuración física con distintas escalas DPI debe comprobarse
@@ -162,6 +188,12 @@ de una cuadrícula. El PNG es el recurso de animación, no un cuerpo fijo al que
 se superponen brazos. Los prompts están en `assets/anime-prompts.json` y
 `assets/transformation-prompts.json` y `assets/fusion-prompts.json`. Los atlas se cargan cuando se selecciona cada
 pareja y sus puntos de contacto se calculan a partir de los fotogramas reales.
+Attack on Titan añade seis atlas con 96 dibujos completos en
+`assets/aot-<eren|armin|reiner>-<human|titan>-anime.png`.
+Los prompts y el estado de los recursos están guardados en `assets/titan-prompts.json`;
+las imágenes disponibles se generaron con la herramienta integrada ImageGen y se
+guardaron en el proyecto. El Colosal contiene el prompt del nuevo dibujo cubierto
+y conserva el intento anterior bloqueado como historial, separado del prompt usado.
 
 Commit propuesto: `[ADD] WaifuPet: Add anime battles and fusions`
 
@@ -180,14 +212,18 @@ Archivos del cambio:
 - `tests/fusions.test.js`, `tests/render-fusions.cjs`
 - `art-preview.png`, `choreography-preview.png`, `transformations-preview.png`, `fusions-preview.png`, `dist/WaifuPet-1.0.0.exe`
 
-## Mejora de ataques de energía y proporciones
+## Modelos de Attack on Titan
 
-Commit propuesto: `[IMP] WaifuPet: Improve attacks and proportions`
+Revisión del Colosal: `[IMP] WaifuPet: Refine Colossal Titan artwork`.
+Archivos de esta revisión: `assets/aot-armin-titan-anime.png`,
+`assets/titan-prompts.json`, `titans-preview.png`, `README.md` y
+`dist/WaifuPet-1.0.0.exe`. Atlas y transformaciones comprobados en Electron.
+
+Commit propuesto: `[ADD] WaifuPet: Add Attack on Titan models`
 
 Archivos de esta mejora:
 
-- `README.md`, `anime-art.js`, `animation-geometry.js`, `fusions.js`, `battle-engine.js`, `combat-controller.js`, `combat.html`, `combat.js`
-- `energy-attacks.js`, `energy-art.js`, `index.html`, `package.json`, `pet.js`
-- `tests/energy-attacks.test.js`, `tests/render-energy.cjs`, `tests/renderer-smoke.cjs`, `energy-preview.png`
-- `tests/render-fusions.cjs`, `fusions-preview.png`
+- `README.md`, `main.js`, `anime-art.js`, `combat-controller.js`, `combat.html`, `combat.js`, `index.html`, `package.json`, `pet.js`, `tests/renderer-smoke.cjs`
+- `titans.js`, `titan-engine.js`, `tests/titan-engine.test.js`, `tests/render-titans.cjs`, `tests/main-menu.test.js`, `tests/combat-controller.test.js`, `titans-preview.png`
+- `assets/aot-eren-human-anime.png`, `assets/aot-eren-titan-anime.png`, `assets/aot-armin-human-anime.png`, `assets/aot-armin-titan-anime.png`, `assets/aot-reiner-human-anime.png`, `assets/aot-reiner-titan-anime.png`, `assets/titan-prompts.json`
 - `dist/WaifuPet-1.0.0.exe`

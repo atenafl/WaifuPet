@@ -6,6 +6,8 @@ const { BattleEngine } = require('./battle-engine');
 const geometry = require('./animation-geometry');
 const transformations = require('./transformations');
 const fusions = require('./fusions');
+const titans = require('./titans');
+const { TitanEngine } = require('./titan-engine');
 
 class CombatController {
   constructor({ displays, send, sound }) {
@@ -29,7 +31,10 @@ class CombatController {
     w.setIgnoreMouseEvents(true, { forward: true }); w.setAlwaysOnTop(this.top, 'screen-saver');
     w.combatReady = false;
     w.loadFile(path.join(__dirname, 'combat.html'), { query: { kind } }).then(async () => {
-      if (!w.isDestroyed() && w.webContents.executeJavaScript) await w.webContents.executeJavaScript('AnimeArt.ready');
+      if (!w.isDestroyed() && w.webContents.executeJavaScript) {
+        const loaded = await w.webContents.executeJavaScript('AnimeArt.ready');
+        if (titans.characters.some(c => c.id === kind) && !loaded.every(Boolean)) throw new Error('Titan animation assets are incomplete');
+      }
       if (!w.isDestroyed()) w.combatReady = true;
     }).catch(() => {});
     w.on('closed', () => this.windows.delete(kind)); this.windows.set(kind, w); return w;
@@ -42,6 +47,10 @@ class CombatController {
     this.windows.clear();
     if (model === 'dragonball') {
       this.engine = new BattleEngine(); this.create('goku'); this.create('vegeta'); this.create('beam');
+    }
+    if (titans.models.includes(model)) {
+      this.titans = new TitanEngine(model);
+      for (const actor of this.titans.actors) if (actor.active) this.create(actor.character);
     }
   }
   setTop(top) {
@@ -160,6 +169,21 @@ class CombatController {
   }
   tick(dt) {
     if (this.paused) return;
+    if (titans.models.includes(this.model)) {
+      const actors = this.titans.actors.filter(a => a.active);
+      if (!actors.every(a => this.windows.get(a.character)?.combatReady)) return;
+      const events = this.titans.update(dt, this.displays(), this.scale);
+      for (const a of actors) {
+        if (a.displayId === null) continue;
+        const w = this.windows.get(a.character), pad = Math.round(30 * this.scale);
+        const width = Math.ceil(a.height * 1.7), height = Math.ceil(a.height * 1.25 + pad * 2);
+        w.setBounds({ x: Math.round(a.x - width / 2), y: Math.round(a.y - height + pad), width, height });
+        w.webContents.send('battle-frame', { ...a, foot: height - pad });
+        if (!w.isVisible()) w.showInactive();
+      }
+      if (events.includes('transform') && this.sound()) this.send('battle-sound:blast');
+      return;
+    }
     if (this.model === 'dragonball') {
       if (this.loadingForm) return;
       if (!['goku', 'vegeta', 'beam'].every((kind) => this.windows.get(kind)?.combatReady)) return;

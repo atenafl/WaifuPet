@@ -112,10 +112,29 @@ app.whenReady().then(async () => {
       assert.ok(!await c.windows.get('goku').webContents.executeJavaScript('frame.character'));
       c.engine.setMode('fight'); await c.setOpponent('buu');
     }
+    await win.webContents.executeJavaScript("doAction('model:attackontitan')");
+    for (let n = 0; n < 100 && !['eren', 'armin', 'reiner'].every(id => c.windows.get(id)?.combatReady); n++) await wait(100);
+    assert.equal(c.windows.size, 3);
+    assert.ok(['eren', 'armin', 'reiner'].every(id => c.windows.get(id)?.combatReady));
+    c.titans.setMotion('run'); c.titans.transform('all', true);
+    for (let n = 0; n < 100; n++) c.tick(1 / 30);
+    await wait(100);
+    for (const a of c.titans.actors) {
+      assert.ok(a.titan && a.height > 300);
+      const actual = await c.windows.get(a.character).webContents.executeJavaScript('({kind:frame.kind,titan:frame.titan,pose:frame.pose,pixels:canvas.getContext("2d").getImageData(0,0,canvas.width,canvas.height).data.some((v,i)=>i%4===3&&v>0)})');
+      assert.equal(actual.kind, 'titan-pet'); assert.ok(actual.titan && actual.pixels);
+    }
+    assert.ok(c.titans.actors[1].height > c.titans.actors[2].height);
+    const positions = c.titans.actors.map(a => a.x); c.paused = true; c.tick(.04);
+    assert.deepEqual(c.titans.actors.map(a => a.x), positions); c.paused = false;
+    c.titans.transform('armin', false); for (let n = 0; n < 100; n++) c.tick(1 / 30);
+    assert.equal(c.titans.actors[1].titan, false); assert.equal(c.titans.actors[0].titan, true);
+    await win.webContents.executeJavaScript("doAction('model:eren')"); await wait(150);
+    assert.equal(c.windows.size, 1); assert.ok(c.windows.has('eren'));
     await win.webContents.executeJavaScript("doAction('model:webillo')"); await wait(200);
     assert.equal(c.windows.size, 0);
     assert.equal(errors.length, 0, errors.join('\n'));
-    process.stdout.write('PASS: Saitama, eight transformation pairs, four fusion rituals, five energy attacks including Broly barrage/cannon, unfusing, roaming and cleanup; no renderer errors.\n');
+    process.stdout.write('PASS: Saitama, eight transformation pairs, four fusion rituals, five energy attacks, three Attack on Titan characters, individual/combined transformations, grounded running, pause and cleanup; no renderer errors.\n');
   } catch (e) { process.stderr.write(e.stack + '\n'); resultCode = 1; }
   if (c) c.close(); if (win) win.destroy(); app.exit(resultCode);
 });

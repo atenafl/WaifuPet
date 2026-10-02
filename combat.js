@@ -12,6 +12,9 @@ function render() {
   g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
   if (!frame) return;
   const f = frame;
+  if (f.kind === 'titan-pet') {
+    renderTitan(f, w); return;
+  }
   if (f.kind === 'beam') {
     window.EnergyArt.beam(g, f);
     return;
@@ -67,6 +70,53 @@ function render() {
   }
   g.restore();
 }
+function renderTitan(f, width) {
+  g.save(); g.translate(width / 2, f.foot); g.globalAlpha = f.opacity;
+  const height = f.height, transitioning = f.transitionAge !== null;
+  const growth = f.pose === 'emerge' && f.titan ? .3 + .7 * Math.sin(Math.min(1, f.transformProgress) * Math.PI / 2) : 1;
+  g.save(); g.scale(f.dir * growth, growth);
+  window.AnimeArt.titan(g, f); g.restore();
+  if (f.titan && (f.character === 'armin' || transitioning)) {
+    for (let i = 0; i < 9; i++) {
+      const age = (f.time * .45 + i * .113) % 1;
+      const x = Math.sin(i * 2.4) * height * .23 + Math.sin(age * 4 + i) * height * .05;
+      const y = -height * (.35 + age * .65), radius = height * (.035 + age * .055);
+      const steam = g.createRadialGradient(x, y, 0, x, y, radius);
+      steam.addColorStop(0, '#fff4e0' + Math.round((1 - age) * 65).toString(16).padStart(2, '0'));
+      steam.addColorStop(1, '#fff4e000'); g.fillStyle = steam;
+      g.beginPath(); g.arc(x, y, radius, 0, Math.PI * 2); g.fill();
+    }
+  }
+  if (transitioning) {
+    const age = f.transitionAge, pulse = Math.max(0, 1 - Math.abs(age - 1.15) / .45);
+    const charge = Math.sin(Math.min(1, age / 1.15) * Math.PI) * .65;
+    g.save(); g.globalAlpha *= Math.max(pulse, charge);
+    const light = g.createRadialGradient(0, -height * .5, 0, 0, -height * .5, height * .64);
+    light.addColorStop(0, '#ffffff'); light.addColorStop(.22, f.color + 'cc'); light.addColorStop(1, f.color + '00');
+    g.fillStyle = light; g.fillRect(-height * .65, -height * 1.2, height * 1.3, height * 1.25);
+    g.strokeStyle = f.color; g.lineWidth = 2.5 * f.scale;
+    for (let i = 0; i < 7; i++) {
+      const a = i * .9 + Math.floor(f.time * 18) * .2;
+      g.beginPath(); g.moveTo(0, -height * .5);
+      for (let j = 1; j < 5; j++) {
+        const r = j * height * .135;
+        g.lineTo(Math.cos(a + (j % 2 ? .1 : -.13)) * r, -height * .5 + Math.sin(a) * r);
+      }
+      g.stroke();
+    }
+    g.restore();
+  }
+  if (f.titan && ['walk', 'run'].includes(f.pose)) {
+    const step = f.gait % 1;
+    g.save(); g.globalAlpha *= (1 - step) * .35; g.fillStyle = '#d9c9a0';
+    for (let i = 0; i < 5; i++) {
+      const x = (i - 2) * height * .025 + (i % 2 ? 1 : -1) * step * height * .06;
+      g.beginPath(); g.ellipse(x, -step * height * .035, height * .013 * (1 + step), height * .009, 0, 0, Math.PI * 2); g.fill();
+    }
+    g.restore();
+  }
+  g.restore();
+}
 function impact(g, age, color, point = { x: 0, y: -169 }) {
   g.save(); g.translate(point.x, point.y); g.globalAlpha = Math.max(0, 1 - age * 3);
   g.strokeStyle = color; g.lineWidth = 4 * Math.max(.15, 1 - age * 2);
@@ -79,6 +129,10 @@ function impact(g, age, color, point = { x: 0, y: -169 }) {
 }
 function hit(e) {
   if (!frame || frame.kind === 'beam' || frame.opacity < .1) return false;
+  if (frame.kind === 'titan-pet') {
+    const halfWidth = frame.height * (frame.titan && frame.character === 'armin' ? .18 : .32);
+    return Math.abs(e.clientX - innerWidth / 2) < halfWidth && e.clientY > frame.foot - frame.height && e.clientY < frame.foot + 6;
+  }
   const x = (e.clientX - innerWidth / 2) / frame.scale;
   const y = (e.clientY - innerHeight / 2 - 92 * frame.scale) / frame.scale;
   return Math.abs(x) < (frame.kind === 'monster' ? 85 : 115) && y > -305 && y < 20;

@@ -46,4 +46,14 @@ test('Right-click menu offers independent combat controls and synchronizes pause
   assert.ok(calls.includes(false));
   const models = template.find((item) => item.label === 'Modelo').submenu;
   models.find((item) => item.label === 'Saitama').click(); assert.ok(calls.includes('saitama'));
+  models.find((item) => item.label === 'Attack on Titan · Los tres').click(); assert.ok(calls.includes('attackontitan'));
+  vm.runInContext(`combat.titans = new (require('./titan-engine').TitanEngine)('attackontitan', () => .5);
+    model = 'attackontitan'; showMenu({sender:{}});`, ctx);
+  assert.equal(template[0].label, 'Titanes y movimiento');
+  const titanControls = template[0].submenu;
+  titanControls[0].submenu[2].click(); assert.equal(vm.runInContext('combat.titans.motion', ctx), 'run');
+  titanControls[1].click(); assert.ok(vm.runInContext('combat.titans.actors.every(a=>a.transition.to)', ctx));
+  titanControls[4].submenu[1].click(); assert.equal(vm.runInContext('combat.titans.actors[1].transition.to', ctx), false);
+  titanControls.at(-1).click({checked:true}); assert.equal(vm.runInContext('combat.titans.automatic', ctx), true);
+  assert.ok(!template.some(item=>item.label === 'Acariciar'));
 });

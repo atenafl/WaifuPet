@@ -41,6 +41,17 @@ test('Pause freezes flight; switching models destroys fighter and beam windows',
   const old = [...c.windows.values()]; c.setModel('saitama');
   assert.equal(c.windows.size, 0); assert.ok(old.every((w) => w.destroyed));
 });
+test('Titan characters use independent grounded windows, freeze on pause and clean up when switching models', async () => {
+  const { controller: c } = harness(); c.setModel('attackontitan'); await Promise.resolve(); c.tick(.03);
+  assert.equal(c.windows.size, 3);
+  assert.ok(c.titans.actors.every(a => a.displayId === 1));
+  const positions = c.titans.actors.map(a => a.x);
+  c.paused = true; c.tick(.03); assert.deepEqual(c.titans.actors.map(a => a.x), positions);
+  const old = [...c.windows.values()]; c.setModel('eren');
+  assert.ok(old.every(w => w.destroyed)); assert.equal(c.windows.size, 1);
+  c.setModel('webillo'); assert.equal(c.windows.size, 0);
+});
+
 test('Monster approaches, requests one punch and is defeated by one impact', async () => {
   const { controller: c, actions } = harness();
   c.setModel('saitama');

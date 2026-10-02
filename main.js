@@ -5,6 +5,7 @@ const { execFile } = require('child_process');
 const { CombatController } = require('./combat-controller');
 const transformations = require('./transformations');
 const fusions = require('./fusions');
+const titans = require('./titans');
 
 const W = 340;
 const H = 380;
@@ -15,7 +16,7 @@ let sound = true;
 let model = 'waifu';
 let sizeId = 'normal';
 const SIZES = ['small', 'normal', 'big'];
-const MODELS = ['waifu', 'webillo', 'saitama', 'dragonball'];
+const MODELS = ['waifu', 'webillo', 'saitama', 'dragonball', ...titans.models];
 let disabled = new Set();
 let combat = null;
 let alwaysOnTop = true;
@@ -26,7 +27,7 @@ function activateModel(m) {
   model = m;
   if (combat) combat.setModel(m);
   if (win && !win.isDestroyed()) {
-    if (m === 'dragonball') win.hide();
+    if (m === 'dragonball' || titans.models.includes(m)) win.hide();
     else if (!win.isVisible()) win.showInactive();
   }
 }
@@ -283,7 +284,7 @@ async function bigPunch() {
 function showMenu(event) {
   const template = [
     {
-      label: model === 'dragonball' ? 'Combate y vuelo' : 'Hacer cosas',
+      label: titans.models.includes(model) ? 'Titanes y movimiento' : model === 'dragonball' ? 'Combate y vuelo' : 'Hacer cosas',
       submenu: model === 'dragonball' ? [
         { label: 'Pelear', type: 'radio', checked: combat.engine.mode === 'fight', click: () => combat.engine.setMode('fight') },
         { label: 'Dejar de pelear y rondar pantallas', type: 'radio', checked: combat.engine.mode === 'roam', click: () => combat.engine.setMode('roam') },
@@ -303,6 +304,20 @@ function showMenu(event) {
           label: opponent.label, type: 'radio', checked: combat.engine.opponent === opponent.id,
           click: () => combat.setOpponent(opponent.id)
         })) }
+      ] : titans.models.includes(model) ? [
+        { label: 'Movimiento', submenu: [['auto', 'Pasear y correr automáticamente'], ['walk', 'Caminar'], ['run', 'Correr'], ['idle', 'Quedarse quietos']].map(([id, label]) => ({
+          label, type: 'radio', checked: combat.titans.motion === id, click: () => combat.titans.setMotion(id)
+        })) },
+        { label: 'Transformar a todos en titanes', click: () => combat.titans.transform('all', true) },
+        { label: 'Volver todos a humanos', click: () => combat.titans.transform('all', false) },
+        ...titans.characters.filter(c => combat.titans.actors.find(a => a.character === c.id)?.active).map(c => ({
+          label: c.label + ' · ' + c.titan, submenu: [
+            { label: 'Transformarse en titán', click: () => combat.titans.transform(c.id, true) },
+            { label: 'Volver a humano', click: () => combat.titans.transform(c.id, false) }
+          ]
+        })),
+        { label: 'Transformaciones automáticas', type: 'checkbox', checked: combat.titans.automatic,
+          click: item => { combat.titans.automatic = item.checked; } }
       ] : [
         { label: 'Leer un libro', click: () => send('read') },
         { label: 'Tomar café', click: () => send('coffee') },
@@ -335,14 +350,16 @@ function showMenu(event) {
         { label: 'Despertar', click: () => send('wake') }
       ]
     },
-    ...(model === 'dragonball' ? [] : [{ label: 'Acariciar', click: () => send('pet') }]),
+    ...(model === 'dragonball' || titans.models.includes(model) ? [] : [{ label: 'Acariciar', click: () => send('pet') }]),
     {
       label: 'Modelo',
       submenu: [
         { label: 'Waifu', type: 'radio', checked: model === 'waifu', click: () => setModel('waifu') },
         { label: 'Webillo', type: 'radio', checked: model === 'webillo', click: () => setModel('webillo') },
         { label: 'Saitama', type: 'radio', checked: model === 'saitama', click: () => setModel('saitama') },
-        { label: 'Goku y Vegeta', type: 'radio', checked: model === 'dragonball', click: () => setModel('dragonball') }
+        { label: 'Goku y Vegeta', type: 'radio', checked: model === 'dragonball', click: () => setModel('dragonball') },
+        { label: 'Attack on Titan · Los tres', type: 'radio', checked: model === 'attackontitan', click: () => setModel('attackontitan') },
+        ...titans.characters.map(c => ({ label: c.label + ' · ' + c.titan, type: 'radio', checked: model === c.id, click: () => setModel(c.id) }))
       ]
     },
     {

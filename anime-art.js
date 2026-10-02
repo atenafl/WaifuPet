@@ -3,7 +3,7 @@
 window.AnimeArt = (() => {
   const atlases = new Map();
   const kind = new URLSearchParams(window.location.search).get('kind');
-  const files = kind === 'beam' ? [] : kind === 'monster' ? ['monsters'] : ['goku', 'vegeta'].includes(kind) ?
+  const files = ['eren', 'armin', 'reiner'].includes(kind) ? ['aot-' + kind + '-human', 'aot-' + kind + '-titan'] : kind === 'beam' ? [] : kind === 'monster' ? ['monsters'] : ['goku', 'vegeta'].includes(kind) ?
     [kind, 'super-saiyan'] : ['goku', 'vegeta', 'saitama', 'super-saiyan', 'monsters'];
   const anchors = { saitama: [[.72, .72, .72, .72], [.70, .70, .70, .70], [.71, .71, .64, .74], [.59, .69, .71, .74]],
     monsters: [[.39, .40, .53, .48], [.48, .48, .52, .70], [.52, .52, .57, .69], [.52, .52, .54, .69]] };
@@ -55,7 +55,7 @@ window.AnimeArt = (() => {
       const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
       const { figures, labels, count } = components(pixels, canvas.width, canvas.height);
       const cells = [];
-      if (figures.length !== 16 || (name.startsWith('fusion-') && count !== 16)) {
+      if (figures.length !== 16 || ((name.startsWith('fusion-') || name.startsWith('aot-')) && count !== 16)) {
         console.error('La animación no contiene 16 personajes completos: ' + name); resolve(false); return;
       }
       for (let index = 0; index < 16; index++) {
@@ -92,7 +92,8 @@ window.AnimeArt = (() => {
       const heights = cells.map((cell) => cell.image.height).sort((a, b) => a - b);
       const characterHeights = name.startsWith('fusion-') && name !== 'fusion-ritual' ? [0, 8].map(offset =>
         cells.slice(offset, offset + 8).map(cell => cell.image.height).sort((a, b) => a - b)[4]) : null;
-      atlases.set(name, { cells, height: transformed ? heights[8] : image.naturalHeight / 4, characterHeights });
+      const titanHeight = name.startsWith('aot-') ? cells.slice(8, 12).map(c => c.image.height).sort((a, b) => a - b)[2] : null;
+      atlases.set(name, { cells, height: titanHeight || (transformed ? heights[8] : image.naturalHeight / 4), characterHeights });
       resolve(true);
     };
     image.onerror = () => { console.error('No se pudo cargar la animación: ' + name); resolve(false); };
@@ -185,5 +186,8 @@ window.AnimeArt = (() => {
     const success = draw(g, window.AnimationFrames.monster(p), 320);
     g.restore(); return success;
   }
-  return { ready, load, landmarks, ritualContact, chargePoint, draw, fighter, saitama, monster };
+  function titan(g, p) {
+    return draw(g, window.Titans.frame(p), p.height);
+  }
+  return { ready, load, landmarks, ritualContact, chargePoint, draw, fighter, saitama, monster, titan };
 })();

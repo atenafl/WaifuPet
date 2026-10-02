@@ -31,8 +31,9 @@ const pick = (arr) => arr[(Math.random() * arr.length) | 0];
 
 const api = window.petAPI;
 
-const MODELS = ['waifu', 'webillo', 'saitama', 'dragonball'];
-const MODEL_NAME = { waifu: 'Waifu', webillo: 'Webillo', saitama: 'Saitama', dragonball: 'Goku y Vegeta' };
+const MODELS = ['waifu', 'webillo', 'saitama', 'dragonball', ...window.Titans.models];
+const MODEL_NAME = { waifu: 'Waifu', webillo: 'Webillo', saitama: 'Saitama', dragonball: 'Goku y Vegeta',
+  attackontitan: 'Attack on Titan', eren: 'Eren', armin: 'Armin', reiner: 'Reiner' };
 let modelId = (() => {
   try {
     const saved = localStorage.getItem('pet.model');
@@ -745,6 +746,7 @@ function jump() {
 }
 
 function doAction(a) {
+  if (a.startsWith('model:') && window.Titans.models.includes(a.slice(6))) { setModel(a.slice(6)); return; }
   if (a.startsWith('battle-energy:')) {
     const [, stage, attack] = a.split(':'), profile = window.EnergyAttacks.get(attack);
     if (stage === 'charge') chargeSound(profile.charge, profile.width > 35);
@@ -1612,7 +1614,7 @@ function pose() {
 function update(dt) {
   if (!paused && encounterHitStop > 0) { encounterHitStop = Math.max(0, encounterHitStop - dt); return; }
   if (!paused) time += dt;
-  if (!ready || modelId === 'dragonball') return;
+  if (!ready || modelId === 'dragonball' || window.Titans.models.includes(modelId)) return;
   computeLayout();
   refreshWA();
   const dc = pickDisplay();
