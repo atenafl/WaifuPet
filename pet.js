@@ -29,7 +29,7 @@ const MODEL_COL = {
     hair: '#d61f43',
     hairDark: '#93122e',
     hairLight: '#ff6b8a',
-    skin: '#f5a94e',
+    skin: '#f7b870',
     dress: '#1d1714',
     dressSh: '#14100e',
     trim: '#f07a2a',
@@ -37,7 +37,7 @@ const MODEL_COL = {
     eye: '#ffc53d',
     eyeSh: '#c97a12',
     sock: '#221a17',
-    shoe: '#d8341a',
+    shoe: '#141110',
     line: '#5a1a0e',
     dark: '#3a140c'
   }
@@ -60,11 +60,12 @@ const MODEL_NAME = { webillo: 'Webillo', tigresa: 'Tigresa' };
 let modelId = (() => {
   try {
     localStorage.removeItem('pet.model');
-    return 'webillo';
+    return 'tigresa';
   } catch (e) {
-    return 'webillo';
+    return 'tigresa';
   }
 })();
+applyModelCol();
 
 function setModel(id) {
   if (MODELS.indexOf(id) < 0 || id === modelId) return;
@@ -225,6 +226,35 @@ const PH = {
   happy: ['¡Miau! ♡', 'Nya~ ♡', '¡Qué rico!', 'Mmmh~ ♡'],
   surprise: ['¡Ay!', '¡Eek!'],
   wake: ['¿Mmm?', 'Ya despierta~']
+};
+
+// Frases extra de la tigresa, tono coqueto: se suman a PH cuando ella habla.
+const PH_TIG = {
+  idle: ['¿Me echas un vistazo~?', '¿Te gusta lo que ves?', 'Mmm, qué pereza...', 'Se me hace tarde... para ti'],
+  walk: ['Ven conmigo~', 'Sígueme... ¿te atreves?', 'Pasea conmigo ♡'],
+  sit: ['¿Te sientas conmigo?', 'Aquí cabemos dos~', 'Tan cómoda...'],
+  read: ['¿Leemos juntos... en la cama?', 'Un capítulo... o dos~'],
+  coffee: ['¿Me das de beber...?', 'Prueba tú primero ♡', 'Mmm, amargo~'],
+  phone: ['Es que me extrañabas, ¿no?', '¿Me buscabas, guapo?', 'jeje, qué atrevido'],
+  dance: ['Baila conmigo~', 'Pégate un poco más...', '♪ Muévete conmigo'],
+  sleep: ['Duerme aquí, a mi lado~', 'No te vayas...'],
+  smoke: ['¿Me acompañas?', 'Puff... qué ganas', 'Nube de por medio~', 'Vapeando... y pensando en ti'],
+  breakfast: ['¿Me das la primera mordida?', 'Mmm, dulce como tú ♡'],
+  stretch: ['¿Me miras estirar~?', 'Se me cayó la manga... ¿no?' ],
+  sing: ['♪ Esta canción es para ti~', 'Canta conmigo, dale'],
+  game: ['Si gano, me besas~', 'Apuesta lo que quieras...', '¿Te atreves a retarme?'],
+  wave: ['¡Ven aquí~!', '¿Otra vez me buscas?', '¡Hola, guapo!'],
+  yawn: ['Vente a dormir conmigo...', 'Qué sueño... en tu hombro~'],
+  shiver: ['Abrízame~', 'Qué frío... ¿me abrazas?'],
+  fall: ['¡Caí a tus pies!', 'Ay... sálvame~', '¿Me levantas tú?'],
+  cheer: ['¡Tú puedes... conmigo!', '¡Vamos... por mí!', '¡Eres el mejor... de mi lista!'],
+  hop: ['¡Salta conmigo!', 'Hop... ¿me sigues?'],
+  spin: ['¿Giro para ti~?', 'Mírame girar de cerca'],
+  clap: ['¡Bravo... para mí!', 'Aplaude... más fuerte~'],
+  peek: ['¿Buscas... a mí?', 'Te pillé mirando~'],
+  happy: ['¡Miau! ♡ para ti', 'Ven a acariciarme ♡', 'Nya~ qué bien me tratas'],
+  surprise: ['¡Eek! Me asustaste...', '¡Me quitaste el aire~'],
+  wake: ['Buenos días... cariño~', '¿Me echabas de menos?']
 };
 
 function enabledDisplays() {
@@ -620,7 +650,8 @@ function phraseChance(s) {
 
 function setStateSay(s) {
   setState(s);
-  if (PH[s] && Math.random() < phraseChance(s)) say(pick(PH[s]));
+  const pool = (modelId === 'tigresa' && PH_TIG[s]) ? PH[s].concat(PH_TIG[s]) : PH[s];
+  if (pool && Math.random() < phraseChance(s)) say(pick(pool));
 }
 
 function chooseNext() {
@@ -1162,27 +1193,34 @@ function spawnSparkles(n) {
   }
 }
 
-// Scene-space position of the lit cigarette tip (model dependent).
+// Scene-space position where the smoke/vapor comes out (model dependent).
 function cigTip() {
   return modelId === 'webillo' ? { x: 43, y: -146 } : { x: 10, y: -137 };
 }
 
 function spawnSmoke() {
   const tip = cigTip();
-  parts.push({
-    t: 'smoke',
-    x: W / 2 + tip.x + rand(-1.5, 1.5),
-    y: GROUND + tip.y,
-    vx: rand(-7, 9),
-    vy: rand(-36, -22),
-    g: -6,
-    life: 0,
-    max: rand(1.2, 1.9),
-    s: rand(3.4, 5.2),
-    rot: rand(0, TAU),
-    vr: rand(-0.7, 0.7),
-    col: '#d3dbd8'
-  });
+  const vape = modelId === 'tigresa';
+  const n = vape ? 3 : 1;
+  for (let i = 0; i < n; i++) {
+    parts.push({
+      t: 'smoke',
+      x: W / 2 + tip.x + rand(-4, 4),
+      y: GROUND + tip.y + rand(-3, 3),
+      vx: rand(-16, 18),
+      vy: vape ? rand(-54, -30) : rand(-36, -22),
+      g: -6,
+      life: 0,
+      max: vape ? rand(2.2, 3.2) : rand(1.2, 1.9),
+      s: vape ? rand(6, 9) : rand(3.4, 5.2),
+      grow: vape ? 1.1 : 1.5,
+      op: vape ? 0.7 : 0.45,
+      ring: vape,
+      rot: rand(0, TAU),
+      vr: rand(-0.7, 0.7),
+      col: vape ? '#e8eef2' : '#d3dbd8'
+    });
+  }
 }
 
 function updateParts(dt) {
@@ -1270,11 +1308,19 @@ function drawParts() {
       ctx.ellipse(0, 0, p.s, p.s * 0.6, 0, 0, TAU);
       ctx.fill();
     } else if (p.t === 'smoke') {
-      ctx.fillStyle = p.col;
-      ctx.globalAlpha = a * 0.45;
+      const rr = p.s * (1 + p.life * (p.grow || 1.5));
+      ctx.globalAlpha = a * (p.op || 0.45);
       ctx.beginPath();
-      ctx.arc(0, 0, p.s * (1 + p.life * 1.5), 0, TAU);
-      ctx.fill();
+      ctx.arc(0, 0, rr, 0, TAU);
+      if (p.ring) {
+        // Aro de vape: solo contorno, se va abriendo.
+        ctx.strokeStyle = p.col;
+        ctx.lineWidth = Math.max(1.6, rr * 0.2);
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = p.col;
+        ctx.fill();
+      }
     } else if (p.t === 'spark') {
       ctx.rotate(p.rot);
       ctx.fillStyle = p.col;
@@ -1338,7 +1384,7 @@ function pose() {
     case 'hop':
       return { shift: 0, legs: 'hop', arms: 'up', prop: null, headDY: -2, tilt: -0.03, irisDy: 0, bob: Math.abs(Math.sin(phase)) * 12 };
     case 'spin':
-      return { shift: 0, legs: 'stand', arms: 'up', prop: null, headDY: 0, tilt: 0, irisDy: 0, bob: 2 };
+      return { shift: 0, legs: 'walk', arms: 'up', prop: null, headDY: 0, tilt: 0, irisDy: 0, bob: 2 };
     case 'clap':
       return { shift: 0, legs: 'stand', arms: 'clap', prop: null, headDY: 0, tilt: 0.02, irisDy: 0, bob: Math.abs(Math.sin(phase)) * 2 };
     case 'peek':
@@ -1454,6 +1500,13 @@ function update(dt) {
           if (Math.random() < dt * 0.05) say(pick(PH.sit));
           break;
         case 'smoke':
+          if (modelId === 'tigresa' && !stateFired) {
+            stateFired = true;
+            spawnSmoke();
+            spawnSmoke();
+            spawnSmoke();
+            spawnSmoke();
+          }
           if (Math.random() < dt * 0.04) say(pick(PH.smoke));
           break;
         case 'breakfast':
@@ -1513,17 +1566,32 @@ function update(dt) {
           lastHopS = h;
           break;
         }
-        case 'spin':
+        case 'spin': {
           if (!stateFired) {
             stateFired = true;
             spawnSparkles(6);
           }
+          // Voltereta hecha en movimiento, a la misma velocidad que al andar.
+          pos.x += dir * 62 * dt;
+          const d = pickDisplay();
+          const b = d.bounds;
+          const fw = winDipW;
+          if (dir > 0 && pos.x >= b.x + b.width - fw && !neighbor(d, 1)) {
+            pos.x = b.x + b.width - fw;
+            dir = -1;
+          } else if (dir < 0 && pos.x <= b.x && !neighbor(d, -1)) {
+            pos.x = b.x;
+            dir = 1;
+          }
+          refreshWA();
+          applyMove();
           spinT -= dt;
           if (spinT <= 0) {
             spawnSparkles(1);
             spinT = 0.3;
           }
           break;
+        }
         case 'clap':
           phase += dt * 9;
           if (Math.random() < dt * 1.4) spawnSparkles(1);
@@ -1549,7 +1617,8 @@ function update(dt) {
         smokeT -= dt;
         if (smokeT <= 0) {
           spawnSmoke();
-          smokeT = rand(0.3, 0.5);
+          // La tigresa vapea: nubes gordas y continuas.
+          smokeT = modelId === 'tigresa' ? rand(0.16, 0.3) : rand(0.3, 0.5);
         }
       } else if (state === 'sing') {
         noteT -= dt;
@@ -1692,37 +1761,37 @@ function drawTail(t) {
     ey = -108 + Math.cos(t * fast * 0.7) * 10;
   }
   ctx.strokeStyle = COL.line;
-  ctx.lineWidth = (tiger ? 27 : 17) * puff;
+  ctx.lineWidth = (tiger ? 20 : 17) * puff;
   ctx.stroke();
-  ctx.strokeStyle = tiger ? '#f5a94e' : COL.hair;
-  ctx.lineWidth = (tiger ? 22 : 13) * puff;
+  ctx.strokeStyle = tiger ? COL.skin : COL.hair;
+  ctx.lineWidth = (tiger ? 15 : 13) * puff;
   ctx.stroke();
   if (tiger) {
     // Rayas de tigre: anillos negros bien marcados a lo largo de la cola.
     ctx.save();
     ctx.setLineDash([15 * puff, 16 * puff]);
     ctx.strokeStyle = '#1c1512';
-    ctx.lineWidth = 22 * puff;
+    ctx.lineWidth = 15 * puff;
     ctx.stroke();
     ctx.restore();
   }
-  ell(ex, ey, (tiger ? 13 : 10) * puff, (tiger ? 13 : 10) * puff, tiger ? '#1c1512' : COL.hair, 2.2);
-  ell(ex, ey, 6, 6, tiger ? '#f7d9c4' : COL.hairLight, 0);
+  ell(ex, ey, (tiger ? 10 : 10) * puff, (tiger ? 10 : 10) * puff, tiger ? '#1c1512' : COL.hair, 2.2);
+  ell(ex, ey, 4.5, 4.5, tiger ? COL.skin : COL.hairLight, 0);
 }
 
 function drawBackHair() {
   if (modelId === 'tigresa') {
-    // Melena larga y ondulada hasta casi tocar el suelo.
+    // Melena larga y ondulada (versión más pequeña).
     ctx.beginPath();
-    ctx.moveTo(-46, -168);
-    ctx.quadraticCurveTo(-78, -104, -66, -46);
-    ctx.quadraticCurveTo(-60, -12, -46, 4);
-    ctx.quadraticCurveTo(-42, -24, -18, -20);
-    ctx.quadraticCurveTo(0, -16, 18, -20);
-    ctx.quadraticCurveTo(42, -24, 46, 4);
-    ctx.quadraticCurveTo(60, -12, 66, -46);
-    ctx.quadraticCurveTo(78, -104, 46, -168);
-    ctx.quadraticCurveTo(0, -186, -46, -168);
+    ctx.moveTo(-41, -196);
+    ctx.quadraticCurveTo(-64, -140, -57, -94);
+    ctx.quadraticCurveTo(-54, -68, -41, -52);
+    ctx.quadraticCurveTo(-37, -64, -16, -60);
+    ctx.quadraticCurveTo(0, -56, 16, -60);
+    ctx.quadraticCurveTo(38, -64, 41, -52);
+    ctx.quadraticCurveTo(54, -68, 57, -94);
+    ctx.quadraticCurveTo(64, -140, 41, -196);
+    ctx.quadraticCurveTo(0, -220, -41, -196);
     ctx.closePath();
     fillStroke(COL.hairDark, 2.4);
     // Mechones claros.
@@ -1732,10 +1801,10 @@ function drawBackHair() {
     ctx.lineWidth = 5;
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(-52, -150);
-    ctx.quadraticCurveTo(-64, -96, -56, -52);
-    ctx.moveTo(52, -150);
-    ctx.quadraticCurveTo(64, -96, 56, -52);
+    ctx.moveTo(-47, -178);
+    ctx.quadraticCurveTo(-57, -128, -51, -96);
+    ctx.moveTo(47, -178);
+    ctx.quadraticCurveTo(57, -128, 51, -96);
     ctx.stroke();
     ctx.restore();
     return;
@@ -1750,6 +1819,123 @@ function drawBackHair() {
   ctx.quadraticCurveTo(0, -184, -40, -168);
   ctx.closePath();
   fillStroke(COL.hairDark, 2.4);
+}
+
+// Katana ceñida a la espalda en diagonal: asoma por encima del hombro y por
+// debajo de la cadera, entre la melena y el cuerpo.
+function drawKatana() {
+  const x0 = -52, y0 = -140; // pomo (kashira), sobre el hombro izquierdo
+  const x1 = 48, y1 = -26;   // punta (kissaki), asomando a la cadera derecha
+  const dx = x1 - x0, dy = y1 - y0;
+  const pl = Math.hypot(dx, dy);
+  const nx = -dy / pl, ny = dx / pl;
+  const at = (t, off) => [x0 + dx * t + nx * off, y0 + dy * t + ny * off];
+  const bowOf = (t) => Math.sin(t * Math.PI) * 5.5;
+  const path = (from, to, off) => {
+    ctx.beginPath();
+    let p = at(from, bowOf(from) + off);
+    ctx.moveTo(p[0], p[1]);
+    for (let t = from + 0.08; t < to; t += 0.08) {
+      p = at(t, bowOf(t) + off);
+      ctx.lineTo(p[0], p[1]);
+    }
+    p = at(to, bowOf(to) + off);
+    ctx.lineTo(p[0], p[1]);
+  };
+
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Saya (fundas) lacada negra.
+  path(0.2, 1, 0);
+  ctx.strokeStyle = '#161219';
+  ctx.lineWidth = 9.5;
+  ctx.stroke();
+  // Brillo del lacre.
+  path(0.25, 0.96, -2.7);
+  ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+  ctx.lineWidth = 2.2;
+  ctx.stroke();
+
+  // Tsuka (empuñadura) con tsukamaki (entrelazado).
+  const hEnd = at(0.2, bowOf(0.2));
+  const hStart = at(0, bowOf(0));
+  ctx.beginPath();
+  ctx.moveTo(hStart[0], hStart[1]);
+  ctx.lineTo(hEnd[0], hEnd[1]);
+  ctx.strokeStyle = '#26222b';
+  ctx.lineWidth = 7.5;
+  ctx.stroke();
+  ctx.strokeStyle = '#4a4152';
+  ctx.lineWidth = 2;
+  for (let i = 1; i <= 5; i++) {
+    const t = (i / 6) * 0.2;
+    const c = at(t, bowOf(t));
+    const dir = i % 2 ? 1 : -1;
+    ctx.beginPath();
+    ctx.moveTo(c[0] + nx * 3.6, c[1] + ny * 3.6);
+    ctx.lineTo(c[0] + nx * 3.6 - dx / pl * 4 * dir, c[1] + ny * 3.6 - dy / pl * 4 * dir);
+    ctx.stroke();
+  }
+
+  // Kashira (pomo).
+  const k = at(0.01, 0);
+  ell(k[0], k[1], 3.8, 3.8, '#161219', 1.6);
+
+  // Tsuba (guardamano) dorado.
+  const g = at(0.2, bowOf(0.2));
+  ctx.save();
+  ctx.translate(g[0], g[1]);
+  ctx.rotate(Math.atan2(dy, dx));
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 2.4, 7.5, 0, 0, TAU);
+  ctx.fillStyle = '#c9a227';
+  ctx.fill();
+  ctx.strokeStyle = '#3a2c0d';
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Cama que aparece debajo de la mascota mientras duerme (marco del suelo).
+function drawBed() {
+  // Cabecero
+  rrect(-66, -46, 9, 44, 3, '#7c4a2d', 2.4, '#4a2a18');
+  // Estructura de madera
+  rrect(-64, -9, 128, 9, 3, '#7c4a2d', 2.4, '#4a2a18');
+  // Colchón
+  rrect(-62, -19, 124, 11, 5, '#f4ecdf', 2.4, '#c9b99f');
+  // Almohada
+  ctx.save();
+  ctx.translate(-46, -25);
+  ctx.rotate(-0.08);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 17, 6.5, 0, 0, TAU);
+  fillStroke('#fdf8ef', 2.2, '#c9b99f');
+  ctx.restore();
+}
+
+// Manta que cubre la mitad inferior del cuerpo dormido (marco del suelo).
+function drawBlanket() {
+  ctx.beginPath();
+  ctx.moveTo(-44, -23);
+  ctx.quadraticCurveTo(-14, -30, 16, -26);
+  ctx.quadraticCurveTo(42, -23, 62, -26);
+  ctx.lineTo(62, -1);
+  ctx.quadraticCurveTo(61, 2, 57, 1);
+  ctx.lineTo(-40, 1);
+  ctx.quadraticCurveTo(-44, 1, -44, -3);
+  ctx.closePath();
+  fillStroke('#d99a3f', 2.4, '#8a5a1c');
+  // Rizo claro del borde superior
+  ctx.beginPath();
+  ctx.moveTo(-44, -23);
+  ctx.quadraticCurveTo(-14, -30, 16, -26);
+  ctx.quadraticCurveTo(42, -23, 62, -26);
+  ctx.strokeStyle = '#efc47e';
+  ctx.lineWidth = 3.4;
+  ctx.lineCap = 'round';
+  ctx.stroke();
 }
 
 function drawLegs(t, mode) {
@@ -1792,13 +1978,34 @@ function drawLegs(t, mode) {
       if (modelId === 'tigresa') limbStripes(hipx, -46, fx, fy, 3);
     }
 
-    // sock (Tigresa: liga completa desde el muslo hasta los pies)
-    const sockY = mode === 'sit' ? -32 : mode === 'curl' ? -34 : mode === 'dangle' ? -16 : -18;
+    // Tigresa: liga en el muslo con la pierna atigrada al descubierto.
+    // Resto de modelos: media.
     if (mode !== 'curl') {
-      const down = modelId === 'tigresa' ? 0.06 : 0.55;
-      const mx = hipx + (fx - hipx) * down;
-      const my = -46 + (fy + 46) * down;
-      limb(mx, my, fx, fy, cx2(mx, fx), my + (fy - my) * 0.5, COL.sock, 11.6, 9);
+      if (modelId === 'tigresa') {
+        const t0 = 0.34;
+        const ccx = (hipx + fx) / 2 + (mode === 'sit' ? 5 * s : 0);
+        const ccy = (-46 + fy) / 2 + (mode === 'sit' ? 6 : 0);
+        const q = (a, b, c) => (1 - t0) * (1 - t0) * a + 2 * (1 - t0) * t0 * b + t0 * t0 * c;
+        const bx = q(hipx, ccx, fx);
+        const by = q(-46, ccy, fy);
+        const tx = 2 * (1 - t0) * (ccx - hipx) + 2 * t0 * (fx - ccx);
+        const ty = 2 * (1 - t0) * (ccy + 46) + 2 * t0 * (fy - ccy);
+        const tl = Math.hypot(tx, ty) || 1;
+        const ex = -ty / tl, ey = tx / tl;
+        ctx.beginPath();
+        ctx.moveTo(bx - ex * 6.5, by - ey * 6.5);
+        ctx.lineTo(bx + ex * 6.5, by + ey * 6.5);
+        ctx.lineCap = 'butt';
+        ctx.strokeStyle = COL.dress;
+        ctx.lineWidth = 5.5;
+        ctx.stroke();
+        ell(bx + ex * 5.4, by + ey * 5.4, 1.5, 1.5, '#c9a227', 0.8);
+      } else {
+        const down = 0.55;
+        const mx = hipx + (fx - hipx) * down;
+        const my = -46 + (fy + 46) * down;
+        limb(mx, my, fx, fy, cx2(mx, fx), my + (fy - my) * 0.5, COL.sock, 11.6, 9);
+      }
     }
     // shoe
     ell(fx + 2.5 * s, fy - 2.5, 9.5, 6, COL.shoe, 2.2);
@@ -1866,15 +2073,15 @@ function drawTigresaBody(t) {
   // --- Torso (piel) ---
   ctx.beginPath();
   ctx.moveTo(-13, -119);
-  ctx.quadraticCurveTo(-20, -112, -19, -101);
-  ctx.quadraticCurveTo(-17, -93, -10, -87);
+  ctx.quadraticCurveTo(-17.5, -112, -17, -101);
+  ctx.quadraticCurveTo(-16, -93, -10, -87);
   ctx.quadraticCurveTo(-20, -74, -25, -60);
-  ctx.quadraticCurveTo(-26, -50, -25, -44);
-  ctx.lineTo(25, -44);
+  ctx.quadraticCurveTo(-26, -50, -25, -46);
+  ctx.lineTo(25, -46);
   ctx.quadraticCurveTo(26, -50, 25, -60);
   ctx.quadraticCurveTo(20, -74, 10, -87);
-  ctx.quadraticCurveTo(17, -93, 19, -101);
-  ctx.quadraticCurveTo(20, -112, 13, -119);
+  ctx.quadraticCurveTo(16, -93, 17, -101);
+  ctx.quadraticCurveTo(17.5, -112, 13, -119);
   ctx.quadraticCurveTo(0, -113, -13, -119);
   ctx.closePath();
   fillStroke(COL.skin, 2.4);
@@ -1882,11 +2089,11 @@ function drawTigresaBody(t) {
   // --- Top halter negro (escote en V) ---
   ctx.beginPath();
   ctx.moveTo(-13, -118);
-  ctx.quadraticCurveTo(-21, -110, -19, -100);
-  ctx.quadraticCurveTo(-18, -92, -10, -90);
+  ctx.quadraticCurveTo(-18.5, -110, -17, -100);
+  ctx.quadraticCurveTo(-17, -92, -10, -90);
   ctx.quadraticCurveTo(0, -88, 10, -90);
-  ctx.quadraticCurveTo(18, -92, 19, -100);
-  ctx.quadraticCurveTo(21, -110, 13, -118);
+  ctx.quadraticCurveTo(17, -92, 17, -100);
+  ctx.quadraticCurveTo(18.5, -110, 13, -118);
   ctx.quadraticCurveTo(5, -110, 0, -100);
   ctx.quadraticCurveTo(-5, -110, -13, -118);
   ctx.closePath();
@@ -1917,10 +2124,10 @@ function drawTigresaBody(t) {
   }
 
   // --- Pelaje de tigre en el torso ---
-  // Panza crema (como la del vientre de un tigre).
+  // Panza del mismo color que el pelaje.
   ctx.beginPath();
   ctx.ellipse(0, -85, 9, 7, 0, 0, TAU);
-  ctx.fillStyle = '#ffe9d2';
+  ctx.fillStyle = COL.skin;
   ctx.fill();
   // Ombligo
   ell(0, -85, 1.7, 2.2, 'rgba(90,40,10,0.55)', 0);
@@ -1935,15 +2142,25 @@ function drawTigresaBody(t) {
   ctx.moveTo(-11, -82); ctx.quadraticCurveTo(-14, -80.5, -17, -82);
   ctx.stroke();
 
+  // --- Braguitas negras (pequeñas, ocultas bajo el ruedo) ---
+  ctx.beginPath();
+  ctx.moveTo(-16, -53);
+  ctx.quadraticCurveTo(-17, -48.5, -11, -48.5);
+  ctx.quadraticCurveTo(0, -47.5, 11, -48.5);
+  ctx.quadraticCurveTo(17, -48.5, 16, -53);
+  ctx.quadraticCurveTo(0, -55, -16, -53);
+  ctx.closePath();
+  fillStroke(COL.dress, 2.2);
+
   // --- Falda negra (llevada la última, encima del pelaje) ---
   const skirt = () => {
     ctx.beginPath();
     ctx.moveTo(-13, -78);
     ctx.quadraticCurveTo(0, -81, 13, -78);
-    ctx.quadraticCurveTo(27, -73, 31, -48);
-    ctx.quadraticCurveTo(16, -41, 0, -40);
-    ctx.quadraticCurveTo(-16, -41, -31, -48);
-    ctx.quadraticCurveTo(-27, -73, -13, -78);
+    ctx.quadraticCurveTo(23, -73, 27, -50);
+    ctx.quadraticCurveTo(14, -48, 0, -47);
+    ctx.quadraticCurveTo(-14, -48, -27, -50);
+    ctx.quadraticCurveTo(-23, -73, -13, -78);
     ctx.closePath();
   };
   skirt();
@@ -1956,9 +2173,9 @@ function drawTigresaBody(t) {
   ctx.lineWidth = 2;
   ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(-7, -77); ctx.quadraticCurveTo(-9, -58, -11, -43);
-  ctx.moveTo(7, -77); ctx.quadraticCurveTo(9, -58, 11, -43);
-  ctx.moveTo(0, -78); ctx.lineTo(0, -41);
+  ctx.moveTo(-7, -77); ctx.quadraticCurveTo(-9, -58, -11, -36);
+  ctx.moveTo(7, -77); ctx.quadraticCurveTo(9, -58, 11, -36);
+  ctx.moveTo(0, -78); ctx.lineTo(0, -35);
   ctx.stroke();
   ctx.restore();
   // Cintura
@@ -2062,16 +2279,36 @@ function limbStripes(x0, y0, x1, y1, n) {
   ctx.restore();
 }
 
+// Hombros: van detrás de los brazos y de la cara.
+function drawShoulders() {
+  for (const s of [-1, 1]) {
+    ell(15.5 * s, -110, 7.5, 7.5, COL.skin, 2.2);
+  }
+}
+
 function drawArm(a) {
   const s = a.sign;
-  const sx = 17 * s;
+  const sx = 15.5 * s;
   const sy = -112;
-  const ex = (sx + a.hx) / 2 + 8 * s;
+  const ex = (sx + a.hx) / 2 + 5 * s;
   const ey = (sy + a.hy) / 2 + 4;
-  limb(sx, sy, a.hx, a.hy, ex, ey, COL.skin, 12.6, 9);
+  limb(sx, sy, a.hx, a.hy, ex, ey, COL.skin, 11.5, 8.2);
   if (modelId === 'tigresa') limbStripes(sx, sy, a.hx, a.hy, 2);
   ell(a.hx, a.hy, 6.5, 6.5, COL.skin, 2);
-  ell(sx, sy + 2, 9, 9, modelId === 'tigresa' ? COL.skin : COL.dress, 2.2);
+  if (modelId === 'tigresa') {
+    // Garritas: tres garras saliendo de la mano en la dirección del brazo.
+    ctx.save();
+    ctx.translate(a.hx, a.hy);
+    ctx.rotate(Math.atan2(a.hy - sy, a.hx - sx));
+    for (const c of [-1, 0, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(4, -1.8 + c * 3.1);
+      ctx.quadraticCurveTo(9.8, c * 3.5, 4, 1.8 + c * 3.1);
+      ctx.closePath();
+      fillStroke('#f7d9c4', 1.2, COL.line);
+    }
+    ctx.restore();
+  }
 }
 
 function drawNeck() {
@@ -2106,12 +2343,11 @@ function drawSideLock(mirror) {
   ctx.save();
   if (mirror) ctx.scale(-1, 1);
   if (modelId === 'tigresa') {
-    // Mechón largo cayendo delante del hombro.
+    // Mechón largo cayendo delante del hombro: curvado hacia dentro y con punta.
     ctx.beginPath();
     ctx.moveTo(-34, -36);
-    ctx.quadraticCurveTo(-57, -2, -49, 42);
-    ctx.quadraticCurveTo(-45, 62, -33, 51);
-    ctx.quadraticCurveTo(-42, 14, -29, -25);
+    ctx.quadraticCurveTo(-64, 16, -30, 52);
+    ctx.quadraticCurveTo(-36, 14, -29, -25);
     ctx.closePath();
     fillStroke(COL.hair, 2.2);
     ctx.restore();
@@ -2129,27 +2365,42 @@ function drawSideLock(mirror) {
 
 function drawBangs() {
   if (modelId === 'tigresa') {
-    // Flequillo lateral despeinado, puntas sesgadas hacia la derecha.
+    // Flequillo: arco alto sobre la frente y puntas sobre los ojos.
     ctx.beginPath();
-    ctx.moveTo(-46, -6);
-    ctx.quadraticCurveTo(-36, -58, 12, -57);
-    ctx.quadraticCurveTo(44, -55, 46, -12);
-    ctx.quadraticCurveTo(41, 6, 35, -9);
-    ctx.quadraticCurveTo(29, 13, 23, -11);
-    ctx.quadraticCurveTo(15, 11, 7, -13);
-    ctx.quadraticCurveTo(-1, 9, -11, -13);
-    ctx.quadraticCurveTo(-21, 7, -31, -11);
-    ctx.quadraticCurveTo(-39, 4, -46, -6);
+    ctx.moveTo(-45, -10);
+    ctx.quadraticCurveTo(0, -62, 45, -10);
+    ctx.lineTo(42, -4);
+    ctx.quadraticCurveTo(34, 4, 28, -13);
+    ctx.quadraticCurveTo(20, 5, 12, -11);
+    ctx.quadraticCurveTo(4, 6, -4, -11);
+    ctx.quadraticCurveTo(-12, 5, -20, -11);
+    ctx.quadraticCurveTo(-28, 4, -34, -13);
+    ctx.lineTo(-45, -10);
     ctx.closePath();
-    fillStroke(COL.hair, 2.4);
+    ctx.fillStyle = COL.hair;
+    ctx.fill();
+    // Contorno solo en el borde inferior (sin línea sobre la cabeza).
+    ctx.beginPath();
+    ctx.moveTo(45, -10);
+    ctx.lineTo(42, -4);
+    ctx.quadraticCurveTo(34, 4, 28, -13);
+    ctx.quadraticCurveTo(20, 5, 12, -11);
+    ctx.quadraticCurveTo(4, 6, -4, -11);
+    ctx.quadraticCurveTo(-12, 5, -20, -11);
+    ctx.quadraticCurveTo(-28, 4, -34, -13);
+    ctx.lineTo(-45, -10);
+    ctx.strokeStyle = COL.line;
+    ctx.lineWidth = 2.4;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
     ctx.save();
     ctx.globalAlpha = 0.55;
     ctx.strokeStyle = COL.hairLight;
     ctx.lineWidth = 4;
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(-28, -34);
-    ctx.quadraticCurveTo(-4, -50, 20, -44);
+    ctx.moveTo(-24, -16);
+    ctx.quadraticCurveTo(-2, -34, 22, -18);
     ctx.stroke();
     ctx.restore();
     return;
@@ -2181,10 +2432,12 @@ function drawBangs() {
 }
 
 function drawAhoge() {
+  const t = modelId === 'tigresa';
+  const b = t ? -40 : -46, tp = t ? -72 : -78;
   ctx.beginPath();
-  ctx.moveTo(-4, -46);
-  ctx.quadraticCurveTo(-12, -72, 8, -78);
-  ctx.quadraticCurveTo(2, -64, 4, -46);
+  ctx.moveTo(-4, b);
+  ctx.quadraticCurveTo(-12, tp + 6, 8, tp);
+  ctx.quadraticCurveTo(2, tp + 14, 4, b);
   ctx.closePath();
   fillStroke(COL.hair, 2.2);
 }
@@ -2196,17 +2449,17 @@ function drawTigerEars() {
     ctx.save();
     ctx.scale(s, 1);
     ctx.beginPath();
-    ctx.moveTo(-34, -30);
+    ctx.moveTo(-34, -26);
     ctx.quadraticCurveTo(-54, -70, -30, -86);
-    ctx.quadraticCurveTo(-13, -70, -14, -44);
+    ctx.quadraticCurveTo(-13, -70, -14, -40);
     ctx.closePath();
     fillStroke(COL.hair, 2.4);
     ctx.beginPath();
-    ctx.moveTo(-29, -38);
+    ctx.moveTo(-29, -34);
     ctx.quadraticCurveTo(-45, -66, -29, -77);
-    ctx.quadraticCurveTo(-20, -62, -19, -47);
+    ctx.quadraticCurveTo(-20, -60, -19, -43);
     ctx.closePath();
-    ctx.fillStyle = '#f7d9c4';
+    ctx.fillStyle = COL.skin;
     ctx.fill();
     ctx.strokeStyle = '#1c1512';
     ctx.lineCap = 'round';
@@ -2247,12 +2500,15 @@ function drawTigerFace() {
     ctx.moveTo(29, 22); ctx.quadraticCurveTo(34, 24, 37, 21.5);
     ctx.moveTo(26, 29); ctx.quadraticCurveTo(29.5, 31, 32, 29);
     ctx.stroke();
-    // Bigotes blancos
+    // Bigotes blancos: abanico de gato (arriba, recto, abajo).
+    // Arrancan lejos de la boca (x=21) y se salen de la cara (el óvalo
+    // llega hasta x≈27-35 a estas alturas).
     ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-    ctx.lineWidth = 1.2;
+    ctx.lineWidth = 2.3;
     ctx.beginPath();
-    ctx.moveTo(10, 28.5); ctx.quadraticCurveTo(22, 27, 32, 26);
-    ctx.moveTo(10, 31.5); ctx.quadraticCurveTo(22, 31, 31, 30.5);
+    ctx.moveTo(21, 26); ctx.quadraticCurveTo(34, 22.5, 46, 19);
+    ctx.moveTo(21, 32); ctx.quadraticCurveTo(34, 32.5, 47, 31);
+    ctx.moveTo(21, 37); ctx.quadraticCurveTo(31, 40.5, 42, 43);
     ctx.stroke();
     ctx.restore();
   }
@@ -2261,6 +2517,7 @@ function drawTigerFace() {
 
 function eyeMode() {
   if (drag) return 'surprise';
+  if (state === 'fall') return 'surprise';
   if (state === 'sleep') return 'sleep';
   if (state === 'yawn' || state === 'sneeze') return 'sleep';
   if (state === 'happy' || state === 'cheer' || state === 'spin' || state === 'clap') return 'happy';
@@ -2270,6 +2527,8 @@ function eyeMode() {
 function mouthMode() {
   if (drag) return 'o';
   switch (state) {
+    case 'fall':
+      return 'o';
     case 'happy':
     case 'dance':
     case 'sing':
@@ -2424,6 +2683,11 @@ function drawMouth() {
     ctx.ellipse(0, 43, 5, 4, 0, 0, TAU);
     ctx.fill();
     ctx.restore();
+    ctx.beginPath();
+    ctx.moveTo(-7, 29);
+    ctx.quadraticCurveTo(0, 29, 7, 29);
+    ctx.quadraticCurveTo(3, 45, -7, 29);
+    ctx.closePath();
     ctx.strokeStyle = COL.dark;
     ctx.lineWidth = 2;
     ctx.stroke();
@@ -2473,7 +2737,8 @@ function drawHead(t, pz) {
   // asoman las puntas (si no, parecen una diadema encima de la cabeza).
   if (modelId === 'tigresa') drawTigerEars();
 
-  ell(0, -2, 46, 46, COL.hair, 2.4);
+  if (modelId === 'tigresa') ell(0, 0, 47, 42, COL.hair, 2.4);
+  else ell(0, -2, 46, 46, COL.hair, 2.4);
 
   // Tigresa no lleva orejas humanas: solo las de tigre.
   if (modelId !== 'tigresa') {
@@ -2588,25 +2853,39 @@ function drawProp(prop, t) {
     ctx.fill();
     ctx.restore();
   } else if (prop === 'cig') {
-    // Held between the fingers, lit end pointing up towards the mouth.
-    const g = modelId === 'webillo'
-      ? { x: 58, y: -90, rot: -1.7, len: 20 }   // + drawWebilloProp offset => scene (46, -126)
-      : { x: 34, y: -134, rot: -3, len: 24 };
-    ctx.save();
-    ctx.translate(g.x, g.y);
-    ctx.rotate(g.rot);
-    rrect(0, -2.3, g.len, 4.6, 2, '#f6f2e7', 1.2, '#c9c2ae');
-    ctx.fillStyle = '#e6c48d';
-    ctx.fillRect(0, -2.3, 6, 4.6);
-    ctx.fillStyle = '#ff8a3d';
-    ctx.beginPath();
-    ctx.ellipse(g.len + 1.6, 0, 3.1, 2.7, 0, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = '#ffe1a6';
-    ctx.beginPath();
-    ctx.ellipse(g.len + 1.6, 0, 1.4, 1.2, 0, 0, TAU);
-    ctx.fill();
-    ctx.restore();
+    if (modelId === 'tigresa') {
+      // Vape: cajita con boquilla apuntando hacia la boca.
+      ctx.save();
+      ctx.translate(34, -134);
+      ctx.rotate(-3);
+      // Cuerpo del vape.
+      rrect(-10, -4.2, 18, 8.4, 2.6, '#2b2230', 1.8, '#15101c');
+      // Ventanita del líquido.
+      rrect(-4, -2.6, 6, 5.2, 1.4, '#7be0ff', 1.2, '#2a6f8a');
+      // LED.
+      ell(6.5, 0, 1.4, 1.4, '#6ee7c7', 0);
+      // Boquilla hacia la boca.
+      rrect(8, -2.2, 7, 4.4, 1.8, '#1c1624', 1.6, '#15101c');
+      ctx.restore();
+    } else {
+      // Held between the fingers, lit end pointing up towards the mouth.
+      const g = { x: 58, y: -90, rot: -1.7, len: 20 };   // + drawWebilloProp offset => scene (46, -126)
+      ctx.save();
+      ctx.translate(g.x, g.y);
+      ctx.rotate(g.rot);
+      rrect(0, -2.3, g.len, 4.6, 2, '#f6f2e7', 1.2, '#c9c2ae');
+      ctx.fillStyle = '#e6c48d';
+      ctx.fillRect(0, -2.3, 6, 4.6);
+      ctx.fillStyle = '#ff8a3d';
+      ctx.beginPath();
+      ctx.ellipse(g.len + 1.6, 0, 3.1, 2.7, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#ffe1a6';
+      ctx.beginPath();
+      ctx.ellipse(g.len + 1.6, 0, 1.4, 1.2, 0, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    }
   } else if (prop === 'toast') {
     ctx.save();
     ctx.translate(17, -97);
@@ -2713,6 +2992,12 @@ function drawScene(dt) {
 
   ctx.save();
   ctx.translate(W / 2, GROUND);
+  if (state === 'sleep') {
+    // Nada por debajo del suelo (el pelo hundido durante el sueño).
+    ctx.beginPath();
+    ctx.rect(-W, -900, W * 2, 900);
+    ctx.clip();
+  }
   if (squash > 0) {
     ctx.scale(1 + squash * 0.16, 1 - squash * 0.12);
   }
@@ -2734,19 +3019,37 @@ function drawScene(dt) {
     ctx.rotate(k * 1.3);
   }
 
+  const slp = state === 'sleep';
   if (modelId === 'webillo') {
+    if (slp) {
+      ctx.translate(0, -(pz.shift - pz.bob));
+      drawBed();
+      ctx.translate(0, pz.shift - pz.bob);
+    }
     drawWebillo(time, pz);
   } else {
     drawTail(time);
     drawBackHair();
+    if (slp) {
+      // La cama va en marco del suelo (sin el desplazamiento del sueño).
+      ctx.translate(0, -(pz.shift - pz.bob));
+      drawBed();
+      ctx.translate(0, pz.shift - pz.bob);
+    }
+    if (modelId === 'tigresa') drawKatana();
     drawLegs(time, pz.legs);
     if (modelId === 'tigresa') drawTigresaBody(time);
     else drawDress(time);
-    for (const ar of armConfig(pz, time)) drawArm(ar);
+    drawShoulders();
     drawNeck();
     drawHead(time, pz);
+    for (const ar of armConfig(pz, time)) drawArm(ar);
     if (state === 'peek' && !drag) drawPeekHands(time, pz);
     if (pz.prop && !drag) drawProp(pz.prop, time);
+  }
+  if (slp) {
+    ctx.translate(0, -(pz.shift - pz.bob));
+    if (!drag) drawBlanket();
   }
 
   ctx.restore();

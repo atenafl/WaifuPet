@@ -9,7 +9,7 @@ const H = 190;
 let win = null;
 let paused = false;
 let sound = true;
-let model = 'webillo';
+let model = 'tigresa';
 let sizeId = 'normal';
 const SIZES = ['small', 'normal', 'big'];
 let disabled = new Set();
@@ -172,7 +172,7 @@ function showMenu() {
         { label: 'Tomar café', click: () => send('coffee') },
         { label: 'Desayunar', click: () => send('breakfast') },
         { label: 'Mirar el móvil', click: () => send('phone') },
-        { label: 'Fumar un cigarro', click: () => send('smoke') },
+        { label: model === 'tigresa' ? 'Vapear' : 'Fumar un cigarro', click: () => send('smoke') },
         { label: 'Estirarse', click: () => send('stretch') },
         { label: 'Cantar', click: () => send('sing') },
         { label: 'Jugar', click: () => send('game') },
