@@ -6,6 +6,7 @@ const { CombatController } = require('./combat-controller');
 const transformations = require('./transformations');
 const fusions = require('./fusions');
 const titans = require('./titans');
+const ninjas = require('./ninjas');
 
 const W = 340;
 const H = 380;
@@ -16,23 +17,25 @@ let sound = true;
 let model = 'waifu';
 let sizeId = 'normal';
 const SIZES = ['small', 'normal', 'big'];
-const MODELS = ['waifu', 'webillo', 'saitama', 'dragonball', ...titans.models];
+const MODELS = ['waifu', 'webillo', 'saitama', 'dragonball', 'naruto', ...titans.models];
 let disabled = new Set();
 let combat = null;
 let alwaysOnTop = true;
 
 function activateModel(m) {
+  if (titans.characters.some(c => c.id === m)) m = 'attackontitan';
   if (!MODELS.includes(m)) return;
   if (model !== m) closeOverlay();
   model = m;
   if (combat) combat.setModel(m);
   if (win && !win.isDestroyed()) {
-    if (m === 'dragonball' || titans.models.includes(m)) win.hide();
+    if (m === 'dragonball' || m === 'naruto' || titans.models.includes(m)) win.hide();
     else if (!win.isVisible()) win.showInactive();
   }
 }
 
 function setModel(m) {
+  if (titans.characters.some(c => c.id === m)) m = 'attackontitan';
   if (MODELS.indexOf(m) < 0) return;
   activateModel(m);
   send('model:' + m);
@@ -284,7 +287,7 @@ async function bigPunch() {
 function showMenu(event) {
   const template = [
     {
-      label: titans.models.includes(model) ? 'Titanes y movimiento' : model === 'dragonball' ? 'Combate y vuelo' : 'Hacer cosas',
+      label: titans.models.includes(model) ? 'Titanes y movimiento' : model === 'naruto' ? 'Combate ninja' : model === 'dragonball' ? 'Combate y vuelo' : 'Hacer cosas',
       submenu: model === 'dragonball' ? [
         { label: 'Pelear', type: 'radio', checked: combat.engine.mode === 'fight', click: () => combat.engine.setMode('fight') },
         { label: 'Dejar de pelear y rondar pantallas', type: 'radio', checked: combat.engine.mode === 'roam', click: () => combat.engine.setMode('roam') },
@@ -304,6 +307,17 @@ function showMenu(event) {
           label: opponent.label, type: 'radio', checked: combat.engine.opponent === opponent.id,
           click: () => combat.setOpponent(opponent.id)
         })) }
+      ] : model === 'naruto' ? [
+        { label: 'Pelear', type: 'radio', checked: combat.ninja.mode === 'fight', click: () => combat.ninja.setMode('fight') },
+        { label: 'Dejar de pelear y rondar pantallas', type: 'radio', checked: combat.ninja.mode === 'roam', click: () => combat.ninja.setMode('roam') },
+        { label: 'Transformaciones', submenu: ninjas.forms.map(form => ({ label: form.label,
+          type: 'radio', checked: combat.ninja.form === form.id,
+          click: () => { combat.ninja.automatic = false; combat.transformNinja(form.id); } })) },
+        { label: 'Progresar hasta Seis Caminos y Rinnegan', type: 'checkbox', checked: combat.ninja.automatic,
+          click: item => { combat.ninja.automatic = item.checked; if (item.checked) combat.transformNinja('child'); } },
+        ...ninjas.characters.map(character=>({label:'Ataques de '+(character==='naruto'?'Naruto':'Sasuke'),submenu:ninjas.skills(character,combat.ninja.form).map(attack=>({
+          label:({punch:'Puñetazo','low-kick':'Patada baja',shuriken:'Ráfaga de shuriken',rasengan:'Rasengan',chidori:'Chidori',katon:'Katon',rasenshuriken:'Rasenshuriken',kyubi:'Forma Kyubi',susanoo:'Susanoo',amaterasu:'Amaterasu · fuego negro',amenotejikara:'Amenotejikara'})[attack],
+          click:()=>combat.ninja.requestAttack(character,attack)}))}))
       ] : titans.models.includes(model) ? [
         { label: 'Movimiento', submenu: [['auto', 'Pasear y correr automáticamente'], ['walk', 'Caminar'], ['run', 'Correr'], ['idle', 'Quedarse quietos']].map(([id, label]) => ({
           label, type: 'radio', checked: combat.titans.motion === id, click: () => combat.titans.setMotion(id)
@@ -350,7 +364,7 @@ function showMenu(event) {
         { label: 'Despertar', click: () => send('wake') }
       ]
     },
-    ...(model === 'dragonball' || titans.models.includes(model) ? [] : [{ label: 'Acariciar', click: () => send('pet') }]),
+    ...(model === 'dragonball' || model === 'naruto' || titans.models.includes(model) ? [] : [{ label: 'Acariciar', click: () => send('pet') }]),
     {
       label: 'Modelo',
       submenu: [
@@ -359,7 +373,7 @@ function showMenu(event) {
         { label: 'Saitama', type: 'radio', checked: model === 'saitama', click: () => setModel('saitama') },
         { label: 'Goku y Vegeta', type: 'radio', checked: model === 'dragonball', click: () => setModel('dragonball') },
         { label: 'Attack on Titan · Los tres', type: 'radio', checked: model === 'attackontitan', click: () => setModel('attackontitan') },
-        ...titans.characters.map(c => ({ label: c.label + ' · ' + c.titan, type: 'radio', checked: model === c.id, click: () => setModel(c.id) }))
+        { label: 'Naruto y Sasuke', type: 'radio', checked: model === 'naruto', click: () => setModel('naruto') }
       ]
     },
     {

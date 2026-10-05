@@ -6,8 +6,8 @@ Electron + Canvas (sin frameworks).
 
 ## Descargar y ejecutar
 
-1. Descarga **`WaifuPet-1.0.0.exe`** de este repositorio (botón *Code →
-   Download ZIP* o el archivo directamente).
+1. Usa el portátil **`dist/WaifuPet-1.0.0.exe`** generado con `npm run dist`.
+   El ejecutable se conserva localmente y está excluido de Git por su tamaño.
 2. Doble clic. No necesita instalación ni Node.js.
 3. La primera vez Windows mostrará **"Windows protegió tu PC"** (el .exe no
    está firmado): pulsa **Más información → Ejecutar de todos modos**.
@@ -28,7 +28,8 @@ Electron + Canvas (sin frameworks).
   sin saltos ni vibración; el suelo se adapta a cada monitor.
 - **Modelos**: waifu (canvas vectorial), webillo (pixel art), Saitama
   (animación anime por fotogramas completos), Goku y Vegeta juntos,
-  y Eren, Armin y Reiner de Attack on Titan, por separado o los tres juntos.
+  Eren, Armin y Reiner juntos en una sola opción de Attack on Titan,
+  y Naruto y Sasuke juntos con siete parejas de formas.
   Saitama además da
   puñetazos (normal, consecutivos y serio, con onda de choque) y va a la
   compra con su bolsa. El puñetazo pedido desde el menú sacude todo el
@@ -82,8 +83,9 @@ Electron + Canvas (sin frameworks).
   a Saitama cancela el encuentro; cambiar de modelo retira los personajes del
   combate anterior. El modelo y el tamaño elegidos se recuerdan al abrir la app.
 - **Attack on Titan**: Eren se convierte en Titán de Ataque, Armin en Colosal
-  y Reiner en Acorazado. Clic derecho → **Modelo** permite elegir uno o **Attack
-  on Titan · Los tres**. En **Titanes y movimiento** puedes caminar, correr,
+  y Reiner en Acorazado. Clic derecho → **Modelo** contiene solamente **Attack
+  on Titan · Los tres**, sin entradas separadas. Las preferencias antiguas de
+  Eren, Armin o Reiner se convierten en el grupo. En **Titanes y movimiento** puedes caminar, correr,
   quedarte quieto o alternar los movimientos automáticamente, transformar a cada
   personaje o a todos, volver a humano y activar las transformaciones automáticas.
   Empiezan como humanos y las primeras transformaciones se escalonan a los 8,
@@ -99,6 +101,27 @@ Electron + Canvas (sin frameworks).
   el dibujo anterior de hombros y piernas voluminosos. Es una adaptación cubierta;
   la versión sin traje fue bloqueada por ImageGen. Las pruebas verifican la carga
   y el funcionamiento de los fotogramas, no la fidelidad exacta al anime.
+- **Naruto y Sasuke**: modelo de combate propio con carreras sobre el suelo,
+  saltos, preparación de golpes, puñetazos, patadas y esquivas. El Rasengan y
+  el Chidori se cargan en las manos antes de lanzarse hacia el rival; también
+  alternan Rasenshuriken, bolas de fuego y choques simultáneos de chakra.
+  El daño se produce por contacto, con retroceso y una pausa breve de impacto.
+  Clic derecho → **Combate ninja** permite pelear, rondar las pantallas,
+  seleccionar una pareja de formas o progresar automáticamente después de
+  mostrar el repertorio de ataques, hasta la pareja final. Cambiar de forma espera la carga
+  de ambos dibujos; pausar congela el combate y cambiar de modelo cierra sus ventanas.
+  Las siete parejas son:
+
+  | Naruto | Sasuke |
+  |---|---|
+  | Niño | Niño |
+  | Chakra rojo | Marca maldita I |
+  | Una cola | Marca maldita II |
+  | Shippuden | Shippuden |
+  | Modo sabio | Mangekyō Sharingan |
+  | Modo Kurama | Mangekyō eterno |
+  | Seis Caminos | Rinnegan |
+
 - **Animaciones**: paseo, baile, sueño, café, lectura, teléfono, cigarrillo,
   desayuno, canto, videojuego, estirarse, saludar, bostezar, tiritar,
   estornudar, animarse con confeti, saltos de conejo, girar, aplaudir,
@@ -142,7 +165,7 @@ compilar desde una terminal **como administrador**.
 
 ## Validación del cambio de combate
 
-`npm test` ejecuta treinta y seis pruebas: vuelo en distintas distribuciones de monitores,
+`npm test` ejecuta cuarenta y dos pruebas: vuelo en distintas distribuciones de monitores,
 modo tranquilo sin ataques, pantallas deshabilitadas, pausa y limpieza de ventanas,
 derrota del monstruo de un golpe, cancelación al arrastrar, controles del menú,
 secuencias de animación, Super Saiyan, orden de los ataques, alcance físico,
@@ -173,7 +196,13 @@ también que los tres ataques de Goku y Vegeta pinten píxeles en la ventana rea
 La galería `titans-preview.png` verifica los seis atlas transparentes y 24 poses:
 `node node_modules/electron/cli.js tests/render-titans.cjs`. La integración de Electron
 comprueba las tres ventanas, sus transformaciones, el regreso individual a humano,
-el modelo de un solo personaje y el cierre de todas las ventanas al cambiar de modelo.
+la migración de preferencias individuales al grupo y el cierre de sus ventanas al cambiar de modelo.
+También comprueba las siete parejas de Naruto y Sasuke, las cargas de ambos,
+Rasenshuriken, bolas de fuego, choques de chakra, pausa y cierre de sus ventanas.
+`node node_modules/electron/cli.js tests/render-ninjas.cjs` verifica transparencia,
+16 siluetas por atlas y contactos reales de todos los ataques permitidos en cada pareja, y
+genera las seis galerías `ninja-*-preview.png`. Las pruebas unitarias cubren progresión automática,
+monitores habilitados, cancelación de ataques y carga concurrente de formas.
 
 La simulación comprueba monitores horizontales, verticales y separados; el ajuste
 visual en una configuración física con distintas escalas DPI debe comprobarse
@@ -227,3 +256,137 @@ Archivos de esta mejora:
 - `titans.js`, `titan-engine.js`, `tests/titan-engine.test.js`, `tests/render-titans.cjs`, `tests/main-menu.test.js`, `tests/combat-controller.test.js`, `titans-preview.png`
 - `assets/aot-eren-human-anime.png`, `assets/aot-eren-titan-anime.png`, `assets/aot-armin-human-anime.png`, `assets/aot-armin-titan-anime.png`, `assets/aot-reiner-human-anime.png`, `assets/aot-reiner-titan-anime.png`, `assets/titan-prompts.json`
 - `dist/WaifuPet-1.0.0.exe`
+
+## Naruto y Sasuke y menú de modelos
+
+Los siete atlas nuevos contienen 112 dibujos completos generados con ImageGen.
+Se guardan en `assets/ninja-<forma>-anime.png`; el prompt exacto y la procedencia
+de cada imagen están en `assets/ninja-prompts.json`. Las ventanas se ajustan a
+los límites de las figuras para mantener dentro las alas, capas, colas y jutsus.
+La selección de formas es una progresión de combate que incluye cambios de edad;
+los dibujos generados son adaptaciones y los detalles pequeños de los ojos se
+aprecian mejor con el tamaño grande. La galería muestra las poses ajustadas a sus tarjetas.
+
+Commit propuesto: `[ADD] WaifuPet: Add Naruto and Sasuke battles`
+
+Archivos de esta mejora:
+
+- `README.md`, `main.js`, `pet.js`, `combat-controller.js`, `combat.js`, `combat.html`, `index.html`, `anime-art.js`, `package.json`
+- `ninjas.js`, `ninja-engine.js`, `ninja-art.js`, `ninjas-preview.png`
+- `assets/ninja-child-anime.png`, `assets/ninja-red-mark-anime.png`, `assets/ninja-tail-curse-anime.png`, `assets/ninja-shippuden-anime.png`, `assets/ninja-sage-mangekyo-anime.png`, `assets/ninja-kurama-eternal-anime.png`, `assets/ninja-sixpaths-rinnegan-anime.png`, `assets/ninja-prompts.json`
+- `tests/ninja-engine.test.js`, `tests/render-ninjas.cjs`, `tests/main-menu.test.js`, `tests/combat-controller.test.js`, `tests/renderer-smoke.cjs`
+
+El portátil actualizado está en `dist/WaifuPet-1.0.0.exe` y está excluido de Git.
+
+
+## Animaciones ampliadas y técnicas ninja
+
+Treinta atlas adicionales aportan 480 dibujos completos: cuatro hojas de dieciséis
+fotogramas para cada una de las siete parejas (movimiento, cuerpo a cuerpo,
+chakra y lanzamientos), otra para Kyubi/Susanoo y otra para invocación,
+Rasenshuriken, Amaterasu y Amenotejikara. Las secuencias tienen cuatro poses
+ordenadas: preparación, movimiento, contacto o lanzamiento y recuperación.
+El motor cambia figuras completas; las energías, los proyectiles y las chispas
+se animan por separado, sin ensamblar extremidades sobre una figura fija.
+
+Ambos personajes alternan puñetazos, patadas bajas y ráfagas de tres shuriken.
+Naruto incorpora Rasengan, Rasenshuriken desde Shippuden y forma Kyubi desde
+Kurama. Sasuke incorpora Chidori, Katon, Amaterasu y Susanoo desde Mangekyō,
+y Amenotejikara con Rinnegan. El intercambio cambia sus posiciones reales
+y da paso al contraataque. Amaterasu genera llamas negras donde está el rival.
+Las invocaciones sustituyen al personaje por el cuerpo completo de la criatura
+o del Susanoo durante su ataque y regresan después a la forma seleccionada.
+
+El clic derecho ofrece «Ataques de Naruto» y «Ataques de Sasuke» con las técnicas
+disponibles en la forma actual. La progresión automática deja suficientes rondas
+para mostrar el repertorio antes de pasar a la siguiente pareja. Rondas, formas,
+modo de paseo y cambios de monitor limpian las invocaciones y proyectiles.
+
+Los puntos de lanzamiento y contacto se calculan del fotograma correspondiente;
+las patadas buscan las piernas y los proyectiles usan el trayecto entre pasos
+para evitar atravesar al rival sin detectar impacto. La extracción adapta el
+umbral de alfa si el brillo une siluetas, y exige dieciséis figuras separadas.
+Las fuentes generadas y sus canales alfa se conservan en los PNG originales.
+Los prompts exactos y su procedencia están en `assets/ninja-motion-prompts.json`.
+
+Validación: 44 pruebas unitarias, siete simulaciones con todos los ataques
+permitidos y sus contactos físicos, comprobación de transparencias, galerías
+y prueba de ventanas reales de Electron con los modelos anteriores, pausa,
+limpieza, fuego negro, intercambio e invocaciones. Las técnicas oculares
+usan dibujos propios, separados de la secuencia de Katon.
+
+Galerías: `ninja-motion-preview.png`, `ninja-melee-preview.png`,
+`ninja-chakra-preview.png`, `ninja-ranged-preview.png`,
+`ninja-avatars-preview.png` y `ninja-techniques-preview.png`.
+La galería `ninjas-preview.png` conserva la primera revisión de las siete parejas.
+
+Commit propuesto: `[IMP] WaifuPet: Expand ninja animations and attacks`
+
+Archivos exactos pendientes para el cambio completo desde el último commit:
+
+- `README.md`
+- `anime-art.js`
+- `combat-controller.js`
+- `combat.html`
+- `combat.js`
+- `index.html`
+- `main.js`
+- `package.json`
+- `pet.js`
+- `tests/combat-controller.test.js`
+- `tests/main-menu.test.js`
+- `tests/renderer-smoke.cjs`
+- `assets/ninja-avatars-anime.png`
+- `assets/ninja-child-anime.png`
+- `assets/ninja-child-chakra-anime.png`
+- `assets/ninja-child-melee-anime.png`
+- `assets/ninja-child-motion-anime.png`
+- `assets/ninja-child-ranged-anime.png`
+- `assets/ninja-kurama-eternal-anime.png`
+- `assets/ninja-kurama-eternal-chakra-anime.png`
+- `assets/ninja-kurama-eternal-melee-anime.png`
+- `assets/ninja-kurama-eternal-motion-anime.png`
+- `assets/ninja-kurama-eternal-ranged-anime.png`
+- `assets/ninja-motion-prompts.json`
+- `assets/ninja-prompts.json`
+- `assets/ninja-red-mark-anime.png`
+- `assets/ninja-red-mark-chakra-anime.png`
+- `assets/ninja-red-mark-melee-anime.png`
+- `assets/ninja-red-mark-motion-anime.png`
+- `assets/ninja-red-mark-ranged-anime.png`
+- `assets/ninja-sage-mangekyo-anime.png`
+- `assets/ninja-sage-mangekyo-chakra-anime.png`
+- `assets/ninja-sage-mangekyo-melee-anime.png`
+- `assets/ninja-sage-mangekyo-motion-anime.png`
+- `assets/ninja-sage-mangekyo-ranged-anime.png`
+- `assets/ninja-shippuden-anime.png`
+- `assets/ninja-shippuden-chakra-anime.png`
+- `assets/ninja-shippuden-melee-anime.png`
+- `assets/ninja-shippuden-motion-anime.png`
+- `assets/ninja-shippuden-ranged-anime.png`
+- `assets/ninja-sixpaths-rinnegan-anime.png`
+- `assets/ninja-sixpaths-rinnegan-chakra-anime.png`
+- `assets/ninja-sixpaths-rinnegan-melee-anime.png`
+- `assets/ninja-sixpaths-rinnegan-motion-anime.png`
+- `assets/ninja-sixpaths-rinnegan-ranged-anime.png`
+- `assets/ninja-tail-curse-anime.png`
+- `assets/ninja-tail-curse-chakra-anime.png`
+- `assets/ninja-tail-curse-melee-anime.png`
+- `assets/ninja-tail-curse-motion-anime.png`
+- `assets/ninja-tail-curse-ranged-anime.png`
+- `assets/ninja-techniques-anime.png`
+- `ninja-art.js`
+- `ninja-avatars-preview.png`
+- `ninja-chakra-preview.png`
+- `ninja-engine.js`
+- `ninja-melee-preview.png`
+- `ninja-motion-preview.png`
+- `ninja-ranged-preview.png`
+- `ninja-techniques-preview.png`
+- `ninjas-preview.png`
+- `ninjas.js`
+- `tests/ninja-engine.test.js`
+- `tests/render-ninjas.cjs`
+
+El ejecutable `dist/WaifuPet-1.0.0.exe` es un artefacto local excluido de Git.
+

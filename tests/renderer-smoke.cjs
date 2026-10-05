@@ -45,7 +45,7 @@ app.whenReady().then(async () => {
     await wait(1400); assert.equal(c.monster, null);
     await win.webContents.executeJavaScript("doAction('model:dragonball')");
     for (let i = 0; i < 60; i++) {
-      if (['goku', 'vegeta'].every((kind) => c.windows.get(kind)?.combatReady)) break;
+      if (['goku', 'vegeta', 'beam'].every((kind) => c.windows.get(kind)?.combatReady) && c.engine.initialized) break;
       await wait(100);
     }
     assert.ok(c.engine.initialized);
@@ -130,11 +130,58 @@ app.whenReady().then(async () => {
     c.titans.transform('armin', false); for (let n = 0; n < 100; n++) c.tick(1 / 30);
     assert.equal(c.titans.actors[1].titan, false); assert.equal(c.titans.actors[0].titan, true);
     await win.webContents.executeJavaScript("doAction('model:eren')"); await wait(150);
-    assert.equal(c.windows.size, 1); assert.ok(c.windows.has('eren'));
+    assert.equal(c.windows.size, 3); assert.ok(c.windows.has('eren') && c.windows.has('armin') && c.windows.has('reiner'));
+    await win.webContents.executeJavaScript("doAction('model:naruto')");
+    for (let n = 0; n < 100 && !['naruto', 'sasuke', 'ninja-effects'].every(id => c.windows.get(id)?.combatReady); n++) await wait(100);
+    clearInterval(c.timer);
+    assert.equal(c.windows.size, 3);
+    for (const form of require('../ninjas').forms) {
+      await c.transformNinja(form.id); assert.equal(c.ninja.form, form.id);
+      c.tick(.03); await wait(60);
+      for (const kind of ['naruto', 'sasuke']) {
+        const actual = await c.windows.get(kind).webContents.executeJavaScript('({form:frame.form,kind:frame.kind,pixels:canvas.getContext("2d").getImageData(0,0,canvas.width,canvas.height).data.some((v,i)=>i%4===3&&v>0)})');
+        assert.equal(actual.form, form.id); assert.equal(actual.kind, 'ninja-pet'); assert.ok(actual.pixels);
+      }
+    }
+    await c.transformNinja('shippuden');
+    const projectiles = new Set(), charged = new Set(); let clash = false;
+    for (let n = 0; n < 16000 && (projectiles.size < 3 || charged.size < 2 || !clash); n++) {
+      c.tick(1/30);
+      if (c.ninja.phase === 'charge' && !charged.has(c.ninja.actors[c.ninja.attacker].character)) {
+        const actor=c.ninja.actors[c.ninja.attacker]; await wait(30);
+        assert.ok(await c.windows.get(actor.character).webContents.executeJavaScript('Number.isFinite(AnimeArt.ninjaPoint(frame.form,frame.character,frame.pose).x)'));
+        charged.add(actor.character);
+      }
+      if (c.ninja.phase === 'clash' && c.ninja.landed) clash = true;
+      if (c.ninja.projectile && !projectiles.has(c.ninja.projectile.attack)) {
+        await wait(30);
+        const actual=await c.windows.get('ninja-effects').webContents.executeJavaScript('({attack:frame.shots[0]?.attack,pixels:canvas.getContext("2d").getImageData(0,0,canvas.width,canvas.height).data.some((v,i)=>i%4===3&&v>0)})');
+        assert.ok(actual.pixels); projectiles.add(actual.attack);
+      }
+    }
+    assert.equal(charged.size, 2); assert.equal(projectiles.size, 3); assert.ok(clash);
+    await c.transformNinja('sixpaths-rinnegan');
+    for(const [character,attack] of [['sasuke','amaterasu'],['sasuke','amenotejikara'],['sasuke','susanoo'],['naruto','kyubi']]){
+      c.ninja.requestAttack(character,attack);let visible=false;
+      for(let i=0;i<140;i++){
+        c.tick(1/30);
+        if(attack==='amaterasu'&&c.ninja.blackFire||attack==='amenotejikara'&&c.ninja.actors.some(a=>a.swapFlash>0)||c.ninja.actors.some(a=>a.avatar===attack)){
+          for(let step=0;step<4;step++)c.tick(1/30);
+          await wait(50);
+          const w=c.windows.get(attack==='amaterasu'?'ninja-effects':character);
+          assert.ok(await w.webContents.executeJavaScript('canvas.getContext("2d").getImageData(0,0,canvas.width,canvas.height).data.some((v,i)=>i%4===3&&v>0)'));
+          visible=true;break;
+        }
+      }
+      assert.ok(visible,attack);
+    }
+    const ninjaPositions=c.ninja.actors.map(a=>a.x); c.paused=true; c.tick(.04);
+    assert.deepEqual(c.ninja.actors.map(a=>a.x),ninjaPositions); c.paused=false;
+    c.ninja.setMode('roam'); c.tick(.03); assert.equal(c.ninja.projectile,null); assert.equal(c.windows.get('ninja-effects').isVisible(),false);
     await win.webContents.executeJavaScript("doAction('model:webillo')"); await wait(200);
     assert.equal(c.windows.size, 0);
     assert.equal(errors.length, 0, errors.join('\n'));
-    process.stdout.write('PASS: Saitama, eight transformation pairs, four fusion rituals, five energy attacks, three Attack on Titan characters, individual/combined transformations, grounded running, pause and cleanup; no renderer errors.\n');
+    process.stdout.write('PASS: Saitama, Dragon Ball, combined Attack on Titan, seven Naruto/Sasuke pairs, chakra charges and clashes, both projectiles, pause and cleanup; no renderer errors.\n');
   } catch (e) { process.stderr.write(e.stack + '\n'); resultCode = 1; }
   if (c) c.close(); if (win) win.destroy(); app.exit(resultCode);
 });

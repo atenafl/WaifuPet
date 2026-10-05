@@ -3,17 +3,17 @@
 window.AnimeArt = (() => {
   const atlases = new Map();
   const kind = new URLSearchParams(window.location.search).get('kind');
-  const files = ['eren', 'armin', 'reiner'].includes(kind) ? ['aot-' + kind + '-human', 'aot-' + kind + '-titan'] : kind === 'beam' ? [] : kind === 'monster' ? ['monsters'] : ['goku', 'vegeta'].includes(kind) ?
+  const files = ['naruto', 'sasuke'].includes(kind) ? [...window.Ninjas.groups.map(group => 'ninja-child-' + group), 'ninja-avatars', 'ninja-techniques'] : kind === 'ninja-effects' ? [] : ['eren', 'armin', 'reiner'].includes(kind) ? ['aot-' + kind + '-human', 'aot-' + kind + '-titan'] : kind === 'beam' ? [] : kind === 'monster' ? ['monsters'] : ['goku', 'vegeta'].includes(kind) ?
     [kind, 'super-saiyan'] : ['goku', 'vegeta', 'saitama', 'super-saiyan', 'monsters'];
   const anchors = { saitama: [[.72, .72, .72, .72], [.70, .70, .70, .70], [.71, .71, .64, .74], [.59, .69, .71, .74]],
     monsters: [[.39, .40, .53, .48], [.48, .48, .52, .70], [.52, .52, .57, .69], [.52, .52, .54, .69]] };
-  function components(pixels, width, height) {
+  function components(pixels, width, height, threshold = 24) {
     const labels = new Int32Array(width * height);
     const queue = new Int32Array(width * height);
     const result = [];
     let id = 0;
     for (let start = 0; start < labels.length; start++) {
-      if (labels[start] || pixels[start * 4 + 3] < 24) continue;
+      if (labels[start] || pixels[start * 4 + 3] < threshold) continue;
       id++;
       let head = 0, tail = 1, minX = width, minY = height, maxX = 0, maxY = 0;
       queue[0] = start; labels[start] = id;
@@ -25,7 +25,7 @@ window.AnimeArt = (() => {
             const px = x + dx, py = y + dy;
             if ((!dx && !dy) || px < 0 || py < 0 || px >= width || py >= height) continue;
             const neighbor = py * width + px;
-            if (!labels[neighbor] && pixels[neighbor * 4 + 3] >= 24) {
+            if (!labels[neighbor] && pixels[neighbor * 4 + 3] >= threshold) {
               labels[neighbor] = id; queue[tail++] = neighbor;
             }
           }
@@ -53,9 +53,17 @@ window.AnimeArt = (() => {
       const context = canvas.getContext('2d', { willReadFrequently: true });
       context.drawImage(image, 0, 0);
       const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-      const { figures, labels, count } = components(pixels, canvas.width, canvas.height);
+      let extracted = components(pixels, canvas.width, canvas.height);
+      if(name.startsWith('ninja-') && extracted.count!==16) {
+        for(const threshold of [80,128,180,220]) {
+          extracted=components(pixels,canvas.width,canvas.height,threshold);
+
+          if(extracted.count===16)break;
+        }
+      }
+      const { figures, labels, count } = extracted;
       const cells = [];
-      if (figures.length !== 16 || ((name.startsWith('fusion-') || name.startsWith('aot-')) && count !== 16)) {
+      if (figures.length !== 16 || ((name.startsWith('fusion-') || name.startsWith('aot-') || name.startsWith('ninja-')) && count !== 16)) {
         console.error('La animación no contiene 16 personajes completos: ' + name); resolve(false); return;
       }
       for (let index = 0; index < 16; index++) {
@@ -76,6 +84,12 @@ window.AnimeArt = (() => {
         }
         fc.putImageData(output, 0, 0);
         const anchor = anchors[name] ? anchors[name][row][column] : .5;
+        let footCenter = 0, footSamples = 0;
+        if (name.startsWith('ninja-')) {
+          for (let y = Math.floor(frame.height * .88); y < frame.height; y++) for (let x = 0; x < frame.width; x++) {
+            if (output.data[(y * frame.width + x) * 4 + 3] > 180) { footCenter += x; footSamples++; }
+          }
+        }
         const slot = index % 8, band = slot === 4 ? [.1, .5] : [.2, .65];
         let tipX = 0, tipY = 0, samples = 0;
         for (let y = Math.floor(frame.height * band[0]); y < frame.height * band[1]; y++) {
@@ -86,11 +100,13 @@ window.AnimeArt = (() => {
           }
         }
         cells.push({ image: frame, foot: frame.height - padding,
-          anchor: column * cw + cw * anchor - figure.minX + padding, tip: { x: tipX, y: tipY / Math.max(1, samples) } });
+          anchor: footSamples ? footCenter / footSamples : column * cw + cw * anchor - figure.minX + padding,
+          tip: { x: tipX, y: tipY / Math.max(1, samples) } });
       }
       const transformed = (window.Transformations.get(name).id === name && name !== 'base') || name.startsWith('fusion-');
       const heights = cells.map((cell) => cell.image.height).sort((a, b) => a - b);
-      const characterHeights = name.startsWith('fusion-') && name !== 'fusion-ritual' ? [0, 8].map(offset =>
+      const ninjaReference = name === 'ninja-avatars' ? 3 : name.endsWith('-motion') ? 4 : 0;
+      const characterHeights = name.startsWith('ninja-') ? [cells[ninjaReference].image.height, cells[ninjaReference + 8].image.height] : name.startsWith('fusion-') && name !== 'fusion-ritual' ? [0, 8].map(offset =>
         cells.slice(offset, offset + 8).map(cell => cell.image.height).sort((a, b) => a - b)[4]) : null;
       const titanHeight = name.startsWith('aot-') ? cells.slice(8, 12).map(c => c.image.height).sort((a, b) => a - b)[2] : null;
       atlases.set(name, { cells, height: titanHeight || (transformed ? heights[8] : image.naturalHeight / 4), characterHeights });
@@ -189,5 +205,49 @@ window.AnimeArt = (() => {
   function titan(g, p) {
     return draw(g, window.Titans.frame(p), p.height);
   }
-  return { ready, load, landmarks, ritualContact, chargePoint, draw, fighter, saitama, monster, titan };
+  function ninja(g, p) { return draw(g, window.Ninjas.frame(p), p.height); }
+  async function loadNinjaForm(form) {
+    const results = await Promise.all([...window.Ninjas.groups.map(group => load('ninja-' + form + '-' + group)), load('ninja-avatars'),load('ninja-techniques')]);
+    return results.every(Boolean);
+  }
+  function ninjaMeta(name, index) {
+    const atlas = atlases.get(name), cell = atlas?.cells[index];
+    if (!cell) return { left:-1, right:1, top:-1.3, hand:{x:.46,y:-.56} };
+    if (cell.ninjaMeta) return cell.ninjaMeta;
+    const height = atlas.characterHeights[Math.floor(index / 8)], canvas = cell.image;
+    const pixels = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+    let tip = cell.tip, sx=0, sy=0, count=0;
+    const low = name.endsWith('-melee') && Math.floor(index / 4) % 2 === 1;
+    const fire = name.endsWith('-ranged') && index >= 12;
+    const blue = name.endsWith('-chakra') || name.endsWith('-ranged') && index < 8 && index >= 4;
+    if (low) {
+      let maxX=0, ySum=0, samples=0;
+      for(let y=Math.floor(canvas.height*.55);y<canvas.height*.95;y++) for(let x=0;x<canvas.width;x++) {
+        if(pixels[(y*canvas.width+x)*4+3]<180)continue;
+        if(x>maxX){maxX=x;ySum=y;samples=1;}else if(x===maxX){ySum+=y;samples++;}
+      }
+      tip={x:maxX,y:ySum/Math.max(1,samples)};
+    }
+    if(blue || fire)for(let y=0;y<canvas.height*.8;y++)for(let x=0;x<canvas.width;x++){
+      const i=(y*canvas.width+x)*4,r=pixels[i],g=pixels[i+1],b=pixels[i+2];
+      if(pixels[i+3]>150 && (fire ? y<canvas.height*.45&&r>180&&r>b+60&&g>70&&g<220&&r/g>1.25 : y>canvas.height*.25&&b>185&&g>140&&b>r+35)){sx+=x;sy+=y;count++;}
+    }
+    if(count>10)tip={x:sx/count,y:sy/count};
+    return cell.ninjaMeta={left:-cell.anchor/height,right:(canvas.width-cell.anchor)/height,top:-cell.foot/height,
+      hand:{x:(tip.x-cell.anchor)/height,y:(tip.y-cell.foot)/height}};
+  }
+  function ninjaPoint(form, character, pose, poseAge=0, actor={}) {
+    const frame=window.Ninjas.frame({...actor,form,character,pose,poseAge});
+    return ninjaMeta(frame.atlas,frame.row*4+frame.column).hand;
+  }
+  function ninjaLandmarks(form, character) {
+    const frames={}, offset=character==='sasuke'?8:0;
+    for(const group of window.Ninjas.groups){const name='ninja-'+form+'-'+group;
+      for(let i=offset;i<offset+8;i++)frames[name+':'+i]=ninjaMeta(name,i);}
+    for(let i=offset;i<offset+8;i++)frames['ninja-avatars:'+i]=ninjaMeta('ninja-avatars',i);
+    for(let i=offset;i<offset+8;i++)frames['ninja-techniques:'+i]=ninjaMeta('ninja-techniques',i);
+    return {frames,punch:ninjaPoint(form,character,'punch',.5),kick:ninjaPoint(form,character,'low-kick',.5),energy:ninjaPoint(form,character,'jutsu',.5)};
+  }
+  return { ready, load, landmarks, ritualContact, chargePoint, draw, fighter, saitama, monster, titan, ninja, loadNinjaForm, ninjaLandmarks, ninjaPoint };
 })();
+

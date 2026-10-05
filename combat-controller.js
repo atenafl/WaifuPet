@@ -8,6 +8,8 @@ const transformations = require('./transformations');
 const fusions = require('./fusions');
 const titans = require('./titans');
 const { TitanEngine } = require('./titan-engine');
+const ninjas = require('./ninjas');
+const { NinjaEngine } = require('./ninja-engine');
 
 class CombatController {
   constructor({ displays, send, sound }) {
@@ -34,12 +36,14 @@ class CombatController {
       if (!w.isDestroyed() && w.webContents.executeJavaScript) {
         const loaded = await w.webContents.executeJavaScript('AnimeArt.ready');
         if (titans.characters.some(c => c.id === kind) && !loaded.every(Boolean)) throw new Error('Titan animation assets are incomplete');
+        if (ninjas.characters.includes(kind) && !loaded.every(Boolean)) throw new Error('Ninja animation assets are incomplete');
       }
       if (!w.isDestroyed()) w.combatReady = true;
     }).catch(() => {});
     w.on('closed', () => this.windows.delete(kind)); this.windows.set(kind, w); return w;
   }
   setModel(model) {
+    if (titans.characters.some(c => c.id === model)) model = 'attackontitan';
     if (this.model === model) return;
     this.model = model; this.monster = null; this.hero = null; this.countdown = 22; this.pendingMonster = false;
     this.transformRevision = (this.transformRevision || 0) + 1; this.loadingForm = false; this.pendingFusion = null;
@@ -47,6 +51,9 @@ class CombatController {
     this.windows.clear();
     if (model === 'dragonball') {
       this.engine = new BattleEngine(); this.create('goku'); this.create('vegeta'); this.create('beam');
+    }
+    if (model === 'naruto') {
+      this.ninja = new NinjaEngine(); this.create('naruto'); this.create('sasuke'); this.create('ninja-effects');
     }
     if (titans.models.includes(model)) {
       this.titans = new TitanEngine(model);
@@ -56,6 +63,26 @@ class CombatController {
   setTop(top) {
     this.top = top;
     for (const w of this.windows.values()) w.setAlwaysOnTop(top, 'screen-saver');
+  }
+  async transformNinja(id) {
+    if (this.model !== 'naruto' || !ninjas.forms.some(f => f.id === id)) return;
+    const revision = this.transformRevision = (this.transformRevision || 0) + 1, engine = this.ninja;
+    this.loadingForm = true;
+    try {
+      const loaded = await Promise.all(ninjas.characters.map(async character => {
+        const w = this.windows.get(character);
+        if (!w || !w.combatReady || w.isDestroyed()) return null;
+        if (!w.webContents.executeJavaScript) return { punch: { x: .46, y: -.56 }, kick: { x: .55, y: -.6 }, energy: { x: .5, y: -.56 } };
+        return w.webContents.executeJavaScript('AnimeArt.loadNinjaForm(' + JSON.stringify(id) +
+          ').then(ok=>ok?AnimeArt.ninjaLandmarks(' + JSON.stringify(id) + ',' + JSON.stringify(character) + '):null)');
+      }));
+      if (revision !== this.transformRevision || engine !== this.ninja || this.model !== 'naruto') return;
+      if (loaded.every(Boolean)) engine.setForm(id, { naruto: loaded[0], sasuke: loaded[1] });
+      else { engine.automatic = false; engine.requestedForm = null; }
+    } catch (error) {
+      if (engine === this.ninja) { engine.automatic = false; engine.requestedForm = null; }
+      console.error('Could not load ninja form:', error.message);
+    } finally { if (revision === this.transformRevision) this.loadingForm = false; }
   }
   async transform(id) {
     if (!transformations.levels.some((level) => level.id === id) || this.model !== 'dragonball') return;
@@ -169,6 +196,36 @@ class CombatController {
   }
   tick(dt) {
     if (this.paused) return;
+    if (this.model === 'naruto') {
+      if (this.loadingForm || !['naruto', 'sasuke', 'ninja-effects'].every(kind => this.windows.get(kind)?.combatReady)) return;
+      if (!this.ninja.landmarks) { this.transformNinja(this.ninja.form); return; }
+      const events = this.ninja.update(dt, this.displays(), this.scale);
+      for (const a of this.ninja.actors) {
+        if (a.displayId === null) continue;
+        const w = this.windows.get(a.character), pad = Math.round(35 * this.scale);
+        const frame = ninjas.frame(a);
+        const bounds = this.ninja.landmarks[a.character].frames?.[frame.atlas+':'+(frame.row*4+frame.column)] || {left:-1,right:1,top:-1.3};
+        const left = Math.min(a.dir > 0 ? bounds.left : -bounds.right, -.85) * a.height - pad;
+        const right = Math.max(a.dir > 0 ? bounds.right : -bounds.left, .85) * a.height + pad;
+        const width = Math.ceil(right - left), height = Math.ceil(Math.max(1.35, -bounds.top) * a.height + pad * 2);
+        w.setBounds({ x: Math.round(a.x + left), y: Math.round(a.y - height + pad), width, height });
+        w.webContents.send('battle-frame', { ...a, originX: -left, foot: height - pad, phase: this.ninja.phase });
+        if (!w.isVisible()) w.showInactive();
+      }
+      const effect = this.windows.get('ninja-effects'), shots = this.ninja.projectiles.filter(p=>!p.hit&&p.age>=0), fire=this.ninja.blackFire;
+      const points=fire?[...shots,fire]:shots;
+      if (points.length) {
+        const radius = Math.round(110 * this.scale), x=Math.floor(Math.min(...points.map(p=>p.x))-radius), y=Math.floor(Math.min(...points.map(p=>p.y))-radius);
+        effect.setBounds({ x, y, width:Math.ceil(Math.max(...points.map(p=>p.x))-x+radius), height:Math.ceil(Math.max(...points.map(p=>p.y))-y+radius) });
+        effect.webContents.send('battle-frame', { kind: 'ninja-effects', shots:shots.map(p=>({...p,x:p.x-x,y:p.y-y})),fire:fire?{...fire,x:fire.x-x,y:fire.y-y}:null,time:this.ninja.time, scale: this.scale });
+        if (!effect.isVisible()) effect.showInactive();
+      } else effect.hide();
+      if (events.includes('next-form')) this.transformNinja(this.ninja.requestedForm);
+      if (this.sound() && events.includes('hit')) this.send('battle-sound:hit');
+      if (this.sound() && events.includes('clash')) this.send('battle-sound:hit');
+      if (this.sound() && events.includes('jutsu')) this.send('battle-sound:blast');
+      return;
+    }
     if (titans.models.includes(this.model)) {
       const actors = this.titans.actors.filter(a => a.active);
       if (!actors.every(a => this.windows.get(a.character)?.combatReady)) return;

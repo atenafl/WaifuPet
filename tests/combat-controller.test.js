@@ -48,10 +48,32 @@ test('Titan characters use independent grounded windows, freeze on pause and cle
   const positions = c.titans.actors.map(a => a.x);
   c.paused = true; c.tick(.03); assert.deepEqual(c.titans.actors.map(a => a.x), positions);
   const old = [...c.windows.values()]; c.setModel('eren');
-  assert.ok(old.every(w => w.destroyed)); assert.equal(c.windows.size, 1);
+  assert.ok(old.every(w => !w.destroyed)); assert.equal(c.windows.size, 3); assert.equal(c.model, 'attackontitan');
   c.setModel('webillo'); assert.equal(c.windows.size, 0);
 });
 
+test('Ninja windows freeze while paused and cannot survive a model switch during an asset load', async () => {
+  const { controller: c } = harness(); c.setModel('naruto'); await Promise.resolve(); await c.transformNinja('child'); c.tick(.03);
+  assert.equal(c.windows.size, 3); assert.ok(c.ninja.actors.every(a => a.displayId === 1));
+  const positions = c.ninja.actors.map(a => a.x); c.paused = true; c.tick(.03);
+  assert.deepEqual(c.ninja.actors.map(a => a.x), positions); c.paused = false;
+  const pending = [];
+  for (const kind of ['naruto', 'sasuke']) c.windows.get(kind).webContents.executeJavaScript = () => new Promise(resolve => pending.push(resolve));
+  const loading = c.transformNinja('sixpaths-rinnegan'); const time = c.ninja.time; c.tick(.03); assert.equal(c.ninja.time, time);
+  const old = [...c.windows.values()]; c.setModel('attackontitan'); pending.forEach(resolve => resolve({punch:{x:.5,y:-.5}})); await loading;
+  assert.ok(old.every(w => w.destroyed)); assert.equal(c.model, 'attackontitan'); assert.equal(c.windows.size, 3);
+  assert.equal(c.ninja.form, 'child'); assert.equal(c.loadingForm, false);
+});
+test('Only the latest loaded ninja form activates and a failed atlas preserves the existing form', async () => {
+  const { controller: c } = harness(); c.setModel('naruto'); await Promise.resolve(); await c.transformNinja('child');
+  const pending = [];
+  for (const kind of ['naruto', 'sasuke']) c.windows.get(kind).webContents.executeJavaScript = () => new Promise(resolve => pending.push(resolve));
+  const first = c.transformNinja('red-mark'), latest = c.transformNinja('tail-curse');
+  pending[0]({}); pending[1]({}); await first; assert.equal(c.ninja.form, 'child');
+  pending[2]({}); pending[3]({}); await latest; assert.equal(c.ninja.form, 'tail-curse');
+  const failed = c.transformNinja('kurama-eternal'); pending[4](null); pending[5]({}); await failed;
+  assert.equal(c.ninja.form, 'tail-curse'); assert.equal(c.ninja.automatic, false); assert.equal(c.loadingForm, false);
+});
 test('Monster approaches, requests one punch and is defeated by one impact', async () => {
   const { controller: c, actions } = harness();
   c.setModel('saitama');

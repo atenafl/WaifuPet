@@ -12,6 +12,9 @@ function render() {
   g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
   if (!frame) return;
   const f = frame;
+  if (f.kind === 'ninja-pet' || f.kind === 'ninja-effects') {
+    window.NinjaArt.render(g, f, w, h); return;
+  }
   if (f.kind === 'titan-pet') {
     renderTitan(f, w); return;
   }
@@ -128,7 +131,10 @@ function impact(g, age, color, point = { x: 0, y: -169 }) {
   g.restore();
 }
 function hit(e) {
-  if (!frame || frame.kind === 'beam' || frame.opacity < .1) return false;
+  if (!frame || frame.kind === 'beam' || frame.kind === 'ninja-effects' || frame.opacity < .1) return false;
+  if (frame.kind === 'ninja-pet') {
+    return Math.abs(e.clientX - (frame.originX ?? innerWidth / 2)) < frame.height * .4 && e.clientY > frame.foot - frame.height && e.clientY < frame.foot + 6;
+  }
   if (frame.kind === 'titan-pet') {
     const halfWidth = frame.height * (frame.titan && frame.character === 'armin' ? .18 : .32);
     return Math.abs(e.clientX - innerWidth / 2) < halfWidth && e.clientY > frame.foot - frame.height && e.clientY < frame.foot + 6;
