@@ -1,0 +1,60 @@
+{
+  "assets": [
+    {
+      "id": "remove-hamon-jotaro",
+      "file": "jojo-jotaro-anime.png",
+      "prompt": "Edit this transparent 4x4 animation atlas. Preserve EXACTLY all sixteen complete drawings of jotaro, every pose, face, canonical clothes, body proportions, wheelchair if present, the existing grid layout and generous transparent gaps. Remove ALL yellow/golden Hamon lightning, golden magic fire, yellow energy around hands or body in every cell, especially bottom row. This character's Stand is rendered separately in the application: show ordinary hands and clean dramatic summoning gestures, with NO energy effects and NO extra humanoid or Stand in this sheet. Preserve sixteen fully separated complete silhouettes with heads and feet uncropped. Genuine transparent background, no text, floor, backdrop, grid or detached particles.",
+      "path": "C:\\Users\\practicas\\.codex\\generated_images\\01a0fb56-bec0-7453-a5f2-56e1780d881c\\exec-253287c8-3790-4a64-9f7a-a9e69ca7d3b8.png",
+      "ref": "C:/Users/practicas/Documents/odoo-18/Wafu/WaifuPet/assets/jojo-jotaro-anime.png"
+    },
+    {
+      "id": "remove-hamon-josuke",
+      "file": "jojo-josuke-anime.png",
+      "prompt": "Edit this transparent 4x4 animation atlas. Preserve EXACTLY all sixteen complete drawings of josuke, every pose, face, canonical clothes, body proportions, wheelchair if present, the existing grid layout and generous transparent gaps. Remove ALL yellow/golden Hamon lightning, golden magic fire, yellow energy around hands or body in every cell, especially bottom row. This character's Stand is rendered separately in the application: show ordinary hands and clean dramatic summoning gestures, with NO energy effects and NO extra humanoid or Stand in this sheet. Preserve sixteen fully separated complete silhouettes with heads and feet uncropped. Genuine transparent background, no text, floor, backdrop, grid or detached particles.",
+      "path": "C:\\Users\\practicas\\.codex\\generated_images\\01a0fb56-bec0-7453-a5f2-56e1780d881c\\exec-bccfc3e6-7593-4636-8977-40143faab7d9.png",
+      "ref": "C:/Users/practicas/Documents/odoo-18/Wafu/WaifuPet/assets/jojo-josuke-anime.png"
+    },
+    {
+      "id": "remove-hamon-giorno",
+      "file": "jojo-giorno-anime.png",
+      "prompt": "Edit this transparent 4x4 animation atlas. Preserve EXACTLY all sixteen complete drawings of giorno, every pose, face, canonical clothes, body proportions, wheelchair if present, the existing grid layout and generous transparent gaps. Remove ALL yellow/golden Hamon lightning, golden magic fire, yellow energy around hands or body in every cell, especially bottom row. This character's Stand is rendered separately in the application: show ordinary hands and clean dramatic summoning gestures, with NO energy effects and NO extra humanoid or Stand in this sheet. Preserve sixteen fully separated complete silhouettes with heads and feet uncropped. Genuine transparent background, no text, floor, backdrop, grid or detached particles.",
+      "path": "C:\\Users\\practicas\\.codex\\generated_images\\01a0fb56-bec0-7453-a5f2-56e1780d881c\\exec-3279fc5e-6e78-4e1a-8e0f-d1c8eaebf60a.png",
+      "ref": "C:/Users/practicas/Documents/odoo-18/Wafu/WaifuPet/assets/jojo-giorno-anime.png"
+    },
+    {
+      "id": "remove-hamon-jolyne",
+      "file": "jojo-jolyne-anime.png",
+      "prompt": "Edit this transparent 4x4 animation atlas. Preserve EXACTLY all sixteen complete drawings of jolyne, every pose, face, canonical clothes, body proportions, wheelchair if present, the existing grid layout and generous transparent gaps. Remove ALL yellow/golden Hamon lightning, golden magic fire, yellow energy around hands or body in every cell, especially bottom row. This character's Stand is rendered separately in the application: show ordinary hands and clean dramatic summoning gestures, with NO energy effects and NO extra humanoid or Stand in this sheet. Preserve sixteen fully separated complete silhouettes with heads and feet uncropped. Genuine transparent background, no text, floor, backdrop, grid or detached particles.",
+      "path": "C:\\Users\\practicas\\.codex\\generated_images\\01a0fb56-bec0-7453-a5f2-56e1780d881c\\exec-13c20e18-15fc-4006-887b-cf6b55fcc64a.png",
+      "ref": "C:/Users/practicas/Documents/odoo-18/Wafu/WaifuPet/assets/jojo-jolyne-anime.png"
+    },
+    {
+      "id": "remove-hamon-johnny",
+      "file": "jojo-johnny-anime.png",
+      "prompt": "Edit this transparent 4x4 animation atlas. Preserve EXACTLY all sixteen complete drawings of johnny, every pose, face, canonical clothes, body proportions, wheelchair if present, the existing grid layout and generous transparent gaps. Remove ALL yellow/golden Hamon lightning, golden magic fire, yellow energy around hands or body in every cell, especially bottom row. This character's Stand is rendered separately in the application: show ordinary hands and clean dramatic summoning gestures, with NO energy effects and NO extra humanoid or Stand in this sheet. Preserve sixteen fully separated complete silhouettes with heads and feet uncropped. Genuine transparent background, no text, floor, backdrop, grid or detached particles.",
+      "path": "C:\\Users\\practicas\\.codex\\generated_images\\01a0fb56-bec0-7453-a5f2-56e1780d881c\\exec-1a7a031b-f8de-4a32-b3ef-a35f18a9a817.png",
+      "ref": "C:/Users/practicas/Documents/odoo-18/Wafu/WaifuPet/assets/jojo-johnny-anime.png"
+    },
+    {
+      "id": "remove-hamon-gappy",
+      "file": "jojo-gappy-anime.png",
+      "prompt": "Edit this transparent 4x4 animation atlas. Preserve EXACTLY all sixteen complete drawings of gappy, every pose, face, canonical clothes, body proportions, wheelchair if present, the existing grid layout and generous transparent gaps. Remove ALL yellow/golden Hamon lightning, golden magic fire, yellow energy around hands or body in every cell, especially bottom row. This character's Stand is rendered separately in the application: show ordinary hands and clean dramatic summoning gestures, with NO energy effects and NO extra humanoid or Stand in this sheet. Preserve sixteen fully separated complete silhouettes with heads and feet uncropped. Genuine transparent background, no text, floor, backdrop, grid or detached particles.",
+      "path": "C:\\Users\\practicas\\.codex\\generated_images\\01a0fb56-bec0-7453-a5f2-56e1780d881c\\exec-cea83116-043f-4eb8-9dbc-181422b785a7.png",
+      "ref": "C:/Users/practicas/Documents/odoo-18/Wafu/WaifuPet/assets/jojo-gappy-anime.png"
+    },
+    {
+      "id": "remove-hamon-joseph-old",
+      "file": "jojo-joseph-old-anime.png",
+      "prompt": "Edit this transparent 4x4 animation atlas. Preserve EXACTLY all sixteen complete drawings of joseph-old, every pose, face, canonical clothes, body proportions, wheelchair if present, the existing grid layout and generous transparent gaps. Remove ALL yellow/golden Hamon lightning, golden magic fire, yellow energy around hands or body in every cell, especially bottom row. This character's Stand is rendered separately in the application: show ordinary hands and clean dramatic summoning gestures, with NO energy effects and NO extra humanoid or Stand in this sheet. Preserve sixteen fully separated complete silhouettes with heads and feet uncropped. Genuine transparent background, no text, floor, backdrop, grid or detached particles.",
+      "path": "C:\\Users\\practicas\\.codex\\generated_images\\01a0fb56-bec0-7453-a5f2-56e1780d881c\\exec-b301b10d-69fe-4470-bdc5-56c73ecba987.png",
+      "ref": "C:/Users/practicas/Documents/odoo-18/Wafu/WaifuPet/assets/jojo-joseph-old-anime.png"
+    },
+    {
+      "id": "sixpaths-spacing",
+      "file": "ninja-sixpaths-rinnegan-melee-anime.png",
+      "prompt": "Edit target: this 4x4 full-character animation atlas. Keep EXACTLY the existing SIXTEEN complete Naruto and Sasuke drawings, same corrected Six Paths Naruto short orange high-collar jacket, black trousers and NO fox tails, same eight punch/low-kick poses per character. FIX LAYOUT ONLY: shrink every complete figure uniformly to fit comfortably WITHIN its own grid cell, centered at the same cell, with very generous clean fully transparent gaps vertically and horizontally. Naruto feet must NEVER touch Sasuke hair below. Each whole head, toes, hand, coat and aura fully within its OWN cell; no figures touching. Preserve body proportions and costume detail, no cropped parts, extra people or detached objects. Genuine transparent background, NO backdrop, floor, text or grid.",
+      "path": "C:\\Users\\practicas\\.codex\\generated_images\\01a0fb56-bec0-7453-a5f2-56e1780d881c\\exec-8e1f4103-7955-4b61-b8e7-1df2a0719904.png",
+      "ref": "C:/Users/practicas/Documents/odoo-18/Wafu/WaifuPet/assets/ninja-sixpaths-rinnegan-melee-anime.png"
+    }
+  ]
+}

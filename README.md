@@ -390,3 +390,138 @@ Archivos exactos pendientes para el cambio completo desde el último commit:
 
 El ejecutable `dist/WaifuPet-1.0.0.exe` es un artefacto local excluido de Git.
 
+## Naruto corregido, Solo Leveling y JoJo
+
+Kurama humano utiliza el abrigo amarillo con marcas negras y dos faldones;
+Seis Caminos utiliza la chaqueta naranja corta, ropa negra y orbes de la verdad
+animados. Ninguno lleva colas de zorro en el cuerpo humano. La invocación muestra
+un Kurama de chakra completo con hocico y nueve colas. Seis Caminos tiene su
+propia hoja de técnicas. La revisión actual de Naruto se ve en
+`naruto-corrected-preview.png`; los atlas ampliados reúnen 496 fotogramas.
+
+«Solo Leveling — Sung Jinwoo» es un modelo de paseo con cinco etapas elegibles
+por clic derecho: nivel 1, 25, 50, 75 y 100, Monarca de las Sombras. La progresión
+automática cambia cada 45 segundos y termina en 100. Estos niveles son una
+progresión de la mascota. Igris se desbloquea en 50, Beru en 75 y Bellion en 100;
+se pueden elegir individualmente o retirar sus invocaciones. Las sombras emergen
+del suelo, siguen a Jinwoo por los monitores y se disuelven al retirarse. No hay
+combate en este modelo. El menú permite caminar, correr, quedarse quieto o invocar.
+
+«JoJo — protagonistas y stands» contiene los ocho protagonistas en una sola
+entrada: Jonathan, Joseph, Jotaro, Josuke, Giorno, Jolyne, Johnny y Josuke de
+JoJolion. Se pueden elegir manualmente o rotar cada 45 segundos. Joseph permite
+alternar entre joven con Hamon y adulto con Hermit Purple, sin añadir un noveno
+protagonista a la rotación. Jonathan también usa Hamon. Los otros seis invocan
+Star Platinum, Crazy Diamond, Gold Experience, Stone Free, Tusk ACT4 y Soft & Wet,
+respectivamente. Johnny se desplaza en silla de ruedas. Los stands acompañan
+a su usuario, aparecen y muestran animaciones; este modelo no añade rivales.
+
+Los nuevos modelos aportan 496 dibujos completos en 31 hojas transparentes.
+Jinwoo tiene 32 fotogramas por nivel, incluidos ciclos de ocho pasos para caminar
+y correr. Cada sombra tiene 32 fotogramas, incluidos ciclos propios de ocho
+pasos al caminar y ocho al correr. Cada protagonista JoJo y stand tiene 16
+fotogramas con movimiento, poses e invocación o exhibición. Se sustituyen dibujos completos;
+los portales, Hamon y Hermit Purple se animan aparte. Los prompts originales y
+las correcciones están en `assets/companions-prompts.json` y
+`assets/companions-corrections-prompts.json` y `assets/companion-gait-prompts.json`.
+
+Referencias de personajes: [Naruto oficial](https://naruto-official.com/en),
+[Solo Leveling: KARMA](https://sololeveling-karma.netmarble.com/en/info) y
+[JoJo All-Star Battle R](https://jojoasbr.bn-ent.net/character/).
+
+Galerías actuales: `solo-levels-preview.png`, `solo-shadows-preview.png`,
+`jojo-preview.png`, `jojo-stands-preview.png` y `naruto-corrected-preview.png`.
+La validación incluye 53 pruebas unitarias, todos los ataques de las siete
+parejas Naruto/Sasuke y ventanas reales de Electron para los niveles, sombras,
+protagonistas, stands, pausa y limpieza entre modelos.
+
+El clic derecho detecta los píxeles visibles de Jinwoo, las sombras y los
+protagonistas JoJo para abrir sus controles. El paseo cruza de forma continua
+los monitores contiguos cuyo suelo está alineado; ante un hueco o un monitor
+a otra altura, da la vuelta. Ya no cambia de pantalla por temporizador.
+Los stands flotan cerca de su dueño, se elevan durante la invocación y no usan
+los ciclos de andar o correr. Las sombras mantienen pasos sincronizados con
+la distancia recorrida y aceleran al alcanzar a Jinwoo. Los nuevos ciclos se
+ven en `solo-shadow-motion-preview.png`.
+
+Commit propuesto: `[IMP] WaifuPet: Fix companion controls and movement`
+
+Archivos exactos para esta ampliación sobre la rama actual:
+
+- `anime-art.js`
+- `assets/companion-gait-prompts.json`
+- `assets/companions-corrections-prompts.json`
+- `assets/companions-prompts.json`
+- `assets/jojo-crazy-diamond-anime.png`
+- `assets/jojo-gappy-anime.png`
+- `assets/jojo-giorno-anime.png`
+- `assets/jojo-gold-experience-anime.png`
+- `assets/jojo-johnny-anime.png`
+- `assets/jojo-jolyne-anime.png`
+- `assets/jojo-jonathan-anime.png`
+- `assets/jojo-joseph-anime.png`
+- `assets/jojo-joseph-old-anime.png`
+- `assets/jojo-josuke-anime.png`
+- `assets/jojo-jotaro-anime.png`
+- `assets/jojo-soft-wet-anime.png`
+- `assets/jojo-star-platinum-anime.png`
+- `assets/jojo-stone-free-anime.png`
+- `assets/jojo-tusk-anime.png`
+- `assets/ninja-avatars-anime.png`
+- `assets/ninja-kurama-eternal-chakra-anime.png`
+- `assets/ninja-kurama-eternal-melee-anime.png`
+- `assets/ninja-kurama-eternal-motion-anime.png`
+- `assets/ninja-kurama-eternal-ranged-anime.png`
+- `assets/ninja-sixpaths-rinnegan-chakra-anime.png`
+- `assets/ninja-sixpaths-rinnegan-melee-anime.png`
+- `assets/ninja-sixpaths-rinnegan-motion-anime.png`
+- `assets/ninja-sixpaths-rinnegan-ranged-anime.png`
+- `assets/ninja-sixpaths-techniques-anime.png`
+- `assets/ninja-techniques-anime.png`
+- `assets/solo-bellion-anime.png`
+- `assets/solo-bellion-motion-anime.png`
+- `assets/solo-beru-anime.png`
+- `assets/solo-beru-motion-anime.png`
+- `assets/solo-e-rank-gesture-anime.png`
+- `assets/solo-e-rank-motion-anime.png`
+- `assets/solo-hunter-gesture-anime.png`
+- `assets/solo-hunter-motion-anime.png`
+- `assets/solo-igris-anime.png`
+- `assets/solo-igris-motion-anime.png`
+- `assets/solo-monarch-gesture-anime.png`
+- `assets/solo-monarch-motion-anime.png`
+- `assets/solo-necromancer-gesture-anime.png`
+- `assets/solo-necromancer-motion-anime.png`
+- `assets/solo-s-rank-gesture-anime.png`
+- `assets/solo-s-rank-motion-anime.png`
+- `combat-controller.js`
+- `combat.html`
+- `combat.js`
+- `companion-art.js`
+- `companion-engine.js`
+- `companions.js`
+- `index.html`
+- `jojo-preview.png`
+- `jojo-stands-preview.png`
+- `main.js`
+- `naruto-corrected-preview.png`
+- `ninja-art.js`
+- `ninja-avatars-preview.png`
+- `ninja-chakra-preview.png`
+- `ninja-melee-preview.png`
+- `ninja-motion-preview.png`
+- `ninja-ranged-preview.png`
+- `ninja-techniques-preview.png`
+- `ninjas.js`
+- `package.json`
+- `pet.js`
+- `README.md`
+- `solo-levels-preview.png`
+- `solo-shadow-motion-preview.png`
+- `solo-shadows-preview.png`
+- `tests/combat-controller.test.js`
+- `tests/companion-engine.test.js`
+- `tests/main-menu.test.js`
+- `tests/render-companions.cjs`
+- `tests/render-ninjas.cjs`
+- `tests/renderer-smoke.cjs`

@@ -17,7 +17,7 @@ try{
   }
   const landmarks=await win.webContents.executeJavaScript('({naruto:AnimeArt.ninjaLandmarks('+JSON.stringify(form.id)+',"naruto"),sasuke:AnimeArt.ninjaLandmarks('+JSON.stringify(form.id)+',"sasuke")})');
   for(const character of catalog.characters){
-   assert.equal(Object.keys(landmarks[character].frames).length,48);
+   assert.equal(Object.keys(landmarks[character].frames).length,form.id==='sixpaths-rinnegan'?56:48);
    for(const attack of catalog.skills(character,form.id)){
     const e=new NinjaEngine(()=>.5);e.setForm(form.id,landmarks);
     const screens=[{id:1,workArea:{x:0,y:0,width:1920,height:1080}}];
@@ -58,7 +58,16 @@ try{
    });return c.toDataURL('image/png').split(',')[1];})()`);
   fs.writeFileSync(path.join(__dirname,'..','ninja-'+group+'-preview.png'),Buffer.from(png,'base64'));
  }
- console.log('PASS: 480 generated keyframes; full seven-phase physical combat and previews.');
+ const correction=await win.webContents.executeJavaScript(`(()=>{
+  const c=document.createElement('canvas');c.width=1560;c.height=720;const g=c.getContext('2d');g.fillStyle='#102034';g.fillRect(0,0,c.width,c.height);
+  const rows=[['Kurama: Naruto humano, Sasuke, avatar Kurama','ninja-kurama-eternal-motion','ninja-techniques'],['Seis Caminos: Naruto humano, Sasuke, técnicas propias','ninja-sixpaths-rinnegan-motion','ninja-sixpaths-techniques']];
+  rows.forEach(([label,atlas,tech],r)=>{
+   g.fillStyle='#eff6ff';g.font='22px sans-serif';g.fillText(label,20,r*360+30);
+   const cards=[{atlas,row:0,column:0},{atlas,row:2,column:0},{atlas:tech,row:0,column:2},{atlas:'ninja-avatars',row:0,column:0}];
+   cards.forEach((frame,j)=>{g.save();g.translate(j*390+195,r*360+330);AnimeArt.draw(g,frame,240);g.restore();});
+  });return c.toDataURL('image/png').split(',')[1];})()`);
+ fs.writeFileSync(path.join(__dirname,'..','naruto-corrected-preview.png'),Buffer.from(correction,'base64'));
+ console.log('PASS: 496 generated keyframes; full seven-phase physical combat and corrected Naruto previews.');
 }catch(error){console.error(error);result=1;}if(win)win.destroy();app.exit(result);
 });
 

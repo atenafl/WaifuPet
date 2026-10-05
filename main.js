@@ -7,6 +7,7 @@ const transformations = require('./transformations');
 const fusions = require('./fusions');
 const titans = require('./titans');
 const ninjas = require('./ninjas');
+const companions = require('./companions');
 
 const W = 340;
 const H = 380;
@@ -17,7 +18,7 @@ let sound = true;
 let model = 'waifu';
 let sizeId = 'normal';
 const SIZES = ['small', 'normal', 'big'];
-const MODELS = ['waifu', 'webillo', 'saitama', 'dragonball', 'naruto', ...titans.models];
+const MODELS = ['waifu', 'webillo', 'saitama', 'dragonball', 'naruto', ...companions.models, ...titans.models];
 let disabled = new Set();
 let combat = null;
 let alwaysOnTop = true;
@@ -29,7 +30,7 @@ function activateModel(m) {
   model = m;
   if (combat) combat.setModel(m);
   if (win && !win.isDestroyed()) {
-    if (m === 'dragonball' || m === 'naruto' || titans.models.includes(m)) win.hide();
+    if (m === 'dragonball' || m === 'naruto' || companions.models.includes(m) || titans.models.includes(m)) win.hide();
     else if (!win.isVisible()) win.showInactive();
   }
 }
@@ -284,10 +285,29 @@ async function bigPunch() {
   send('fx-ready');
 }
 
+function companionMenu(){
+  const e=combat.companions,solo=model==='sololeveling';
+  const choose=id=>{e.automatic=false;combat.selectCompanion(id);};
+  return [
+    {label:'Movimiento',submenu:[['walk','Pasear'],['run','Moverse deprisa'],['idle','Quedarse quieto']].map(([id,label])=>({
+      label,type:'radio',checked:e.motion===id,click:()=>e.setMotion(id)}))},
+    solo?{label:'Nivel de Sung Jinwoo',submenu:companions.levels.map(l=>({label:l.label,type:'radio',checked:e.selection===l.id,click:()=>choose(l.id)}))}:
+      {label:'Protagonista',submenu:companions.jojo.map(c=>c.id==='joseph'?{label:c.label,submenu:[
+        {label:'Battle Tendency · Hamon',type:'radio',checked:e.selection==='joseph',click:()=>choose('joseph')},
+        {label:'Stardust Crusaders · Hermit Purple',type:'radio',checked:e.selection==='joseph-old',click:()=>choose('joseph-old')}
+      ]}:{label:c.label,type:'radio',checked:e.selection===c.id,click:()=>choose(c.id)})},
+    {label:solo?'Progresar hasta nivel 100':'Rotar los ocho protagonistas',type:'checkbox',checked:e.automatic,click:item=>{e.automatic=item.checked;e.selectionAge=0;}},
+    {label:solo?'Invocaciones automáticas':'Mostrar Stand o Hamon',type:'checkbox',checked:e.summons,click:item=>e.setSummons(item.checked)},
+    {label:solo?'Invocar las sombras':'Invocar Stand / mostrar Hamon',enabled:e.summons,click:()=>e.summon()},
+    {label:solo?'Retirar las sombras':'Retirar Stand',click:()=>e.dismiss()},
+    ...(solo?[{label:'Sombras acompañantes',submenu:companions.shadows.map(s=>({label:s.label+' · Nivel '+s.unlock,type:'checkbox',
+      checked:e.selectedShadows.has(s.id),enabled:companions.level(e.selection).level>=s.unlock,click:item=>{e.setShadow(s.id,item.checked);if(item.checked)e.summon();}}))}]:[])
+  ];
+}
 function showMenu(event) {
   const template = [
     {
-      label: titans.models.includes(model) ? 'Titanes y movimiento' : model === 'naruto' ? 'Combate ninja' : model === 'dragonball' ? 'Combate y vuelo' : 'Hacer cosas',
+      label: companions.models.includes(model) ? (model==='sololeveling'?'Monarca y sombras':'Personajes y stands') : titans.models.includes(model) ? 'Titanes y movimiento' : model === 'naruto' ? 'Combate ninja' : model === 'dragonball' ? 'Combate y vuelo' : 'Hacer cosas',
       submenu: model === 'dragonball' ? [
         { label: 'Pelear', type: 'radio', checked: combat.engine.mode === 'fight', click: () => combat.engine.setMode('fight') },
         { label: 'Dejar de pelear y rondar pantallas', type: 'radio', checked: combat.engine.mode === 'roam', click: () => combat.engine.setMode('roam') },
@@ -318,7 +338,7 @@ function showMenu(event) {
         ...ninjas.characters.map(character=>({label:'Ataques de '+(character==='naruto'?'Naruto':'Sasuke'),submenu:ninjas.skills(character,combat.ninja.form).map(attack=>({
           label:({punch:'Puñetazo','low-kick':'Patada baja',shuriken:'Ráfaga de shuriken',rasengan:'Rasengan',chidori:'Chidori',katon:'Katon',rasenshuriken:'Rasenshuriken',kyubi:'Forma Kyubi',susanoo:'Susanoo',amaterasu:'Amaterasu · fuego negro',amenotejikara:'Amenotejikara'})[attack],
           click:()=>combat.ninja.requestAttack(character,attack)}))}))
-      ] : titans.models.includes(model) ? [
+      ] : companions.models.includes(model) ? companionMenu() : titans.models.includes(model) ? [
         { label: 'Movimiento', submenu: [['auto', 'Pasear y correr automáticamente'], ['walk', 'Caminar'], ['run', 'Correr'], ['idle', 'Quedarse quietos']].map(([id, label]) => ({
           label, type: 'radio', checked: combat.titans.motion === id, click: () => combat.titans.setMotion(id)
         })) },
@@ -364,7 +384,7 @@ function showMenu(event) {
         { label: 'Despertar', click: () => send('wake') }
       ]
     },
-    ...(model === 'dragonball' || model === 'naruto' || titans.models.includes(model) ? [] : [{ label: 'Acariciar', click: () => send('pet') }]),
+    ...(model === 'dragonball' || model === 'naruto' || companions.models.includes(model) || titans.models.includes(model) ? [] : [{ label: 'Acariciar', click: () => send('pet') }]),
     {
       label: 'Modelo',
       submenu: [
@@ -373,7 +393,9 @@ function showMenu(event) {
         { label: 'Saitama', type: 'radio', checked: model === 'saitama', click: () => setModel('saitama') },
         { label: 'Goku y Vegeta', type: 'radio', checked: model === 'dragonball', click: () => setModel('dragonball') },
         { label: 'Attack on Titan · Los tres', type: 'radio', checked: model === 'attackontitan', click: () => setModel('attackontitan') },
-        { label: 'Naruto y Sasuke', type: 'radio', checked: model === 'naruto', click: () => setModel('naruto') }
+        { label: 'Naruto y Sasuke', type: 'radio', checked: model === 'naruto', click: () => setModel('naruto') },
+        { label: 'Solo Leveling · Sung Jinwoo', type: 'radio', checked: model === 'sololeveling', click: () => setModel('sololeveling') },
+        { label: 'JoJo · Protagonistas', type: 'radio', checked: model === 'jojo', click: () => setModel('jojo') }
       ]
     },
     {

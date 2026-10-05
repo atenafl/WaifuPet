@@ -10,6 +10,8 @@ const titans = require('./titans');
 const { TitanEngine } = require('./titan-engine');
 const ninjas = require('./ninjas');
 const { NinjaEngine } = require('./ninja-engine');
+const companions = require('./companions');
+const { CompanionEngine } = require('./companion-engine');
 
 class CombatController {
   constructor({ displays, send, sound }) {
@@ -55,6 +57,10 @@ class CombatController {
     if (model === 'naruto') {
       this.ninja = new NinjaEngine(); this.create('naruto'); this.create('sasuke'); this.create('ninja-effects');
     }
+    if (companions.models.includes(model)) {
+      this.companions = new CompanionEngine(model);
+      for(const a of this.companions.actors)this.create(a.id);
+    }
     if (titans.models.includes(model)) {
       this.titans = new TitanEngine(model);
       for (const actor of this.titans.actors) if (actor.active) this.create(actor.character);
@@ -63,6 +69,28 @@ class CombatController {
   setTop(top) {
     this.top = top;
     for (const w of this.windows.values()) w.setAlwaysOnTop(top, 'screen-saver');
+  }
+  async selectCompanion(id) {
+    if(!companions.models.includes(this.model))return;
+    const engine=this.companions,model=this.model;
+    const valid=model==='sololeveling'?companions.levels.some(l=>l.id===id):[...companions.jojo,companions.olderJoseph].some(c=>c.id===id);
+    if(!valid)return;
+    const revision=this.transformRevision=(this.transformRevision||0)+1;this.loadingForm=true;
+    try{
+      const loaded=await Promise.all(engine.actors.map(async a=>{
+        const w=this.windows.get(a.id);if(!w?.combatReady||w.isDestroyed())return null;
+        const names=a.role==='hero'?companions.assets(model,id).filter(name=>model==='sololeveling'?name==='solo-'+id+'-motion'||name==='solo-'+id+'-gesture':name==='jojo-'+id):
+          a.role==='shadow'?['solo-'+a.character,'solo-'+a.character+'-motion']:companions.assets(model,id).filter(name=>name!=='jojo-'+id);
+        if(!w.webContents.executeJavaScript)return {frames:{}};
+        return w.webContents.executeJavaScript('AnimeArt.loadCompanionAssets('+JSON.stringify(names)+').then(ok=>ok?AnimeArt.companionLandmarks('+JSON.stringify(names)+'):null)');
+      }));
+      if(revision!==this.transformRevision||engine!==this.companions||model!==this.model)return;
+      if(loaded.every(Boolean)){engine.select(id);engine.landmarks=Object.fromEntries(engine.actors.map((a,i)=>[a.id,loaded[i]]));}
+      else{engine.automatic=false;engine.requestedSelection=null;}
+    }catch(error){
+      if(engine===this.companions){engine.automatic=false;engine.requestedSelection=null;}
+      console.error('Could not load companion assets:',error.message);
+    }finally{if(revision===this.transformRevision)this.loadingForm=false;}
   }
   async transformNinja(id) {
     if (this.model !== 'naruto' || !ninjas.forms.some(f => f.id === id)) return;
@@ -196,6 +224,24 @@ class CombatController {
   }
   tick(dt) {
     if (this.paused) return;
+    if(companions.models.includes(this.model)){
+      const engine=this.companions;
+      if(this.loadingForm||!engine.actors.every(a=>this.windows.get(a.id)?.combatReady))return;
+      if(!engine.landmarks){this.selectCompanion(engine.selection);return;}
+      const events=engine.update(dt,this.displays(),this.scale);
+      for(const a of engine.actors){
+        const w=this.windows.get(a.id);if(!a.active||a.displayId===null){w.hide();continue;}
+        const frame=companions.frame(a),b=engine.landmarks[a.id].frames[frame.atlas+':'+(frame.row*4+frame.column)]||{left:-1,right:1,top:-1.3};
+        const pad=Math.ceil(24*this.scale),left=Math.min(a.dir>0?b.left:-b.right,-.8)*a.height-pad;
+        const right=Math.max(a.dir>0?b.right:-b.left,.8)*a.height+pad;
+        const width=Math.ceil(right-left),height=Math.ceil(Math.max(1.15,-b.top)*a.height+pad*2);
+        w.setBounds({x:Math.round(a.x+left),y:Math.round(a.y-height+pad),width,height});
+        w.webContents.send('battle-frame',{...a,originX:-left,foot:height-pad});
+        if(!w.isVisible())w.showInactive();
+      }
+      if(events.includes('selection'))this.selectCompanion(engine.requestedSelection);
+      return;
+    }
     if (this.model === 'naruto') {
       if (this.loadingForm || !['naruto', 'sasuke', 'ninja-effects'].every(kind => this.windows.get(kind)?.combatReady)) return;
       if (!this.ninja.landmarks) { this.transformNinja(this.ninja.form); return; }

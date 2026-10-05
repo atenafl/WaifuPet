@@ -75,4 +75,16 @@ test('Right-click menu offers independent combat controls and synchronizes pause
   assert.equal(vm.runInContext('combat.ninja.forcedAttack.attack',ctx),'amenotejikara');
   finalControls[4].submenu.find(item=>item.label==='Forma Kyubi').click();
   assert.equal(vm.runInContext('combat.ninja.forcedAttack.attack',ctx),'kyubi');
+  vm.runInContext(`combat.companions=new (require('./companion-engine').CompanionEngine)('jojo');
+    combat.selectCompanion=id=>combat.companions.select(id);model='jojo';showMenu({sender:{}});`,ctx);
+  assert.equal(template[0].label,'Personajes y stands');
+  assert.equal(template[0].submenu[1].submenu.length,8);
+  template[0].submenu[1].submenu[2].click();assert.equal(vm.runInContext('combat.companions.selection',ctx),'jotaro');
+  assert.equal(vm.runInContext('combat.companions.automatic',ctx),false);
+  vm.runInContext(`combat.companions=new (require('./companion-engine').CompanionEngine)('sololeveling');model='sololeveling';showMenu({sender:{}});`,ctx);
+  assert.equal(template[0].submenu[1].submenu.length,5);
+  template[0].submenu[1].submenu[4].click();assert.equal(vm.runInContext('combat.companions.selection',ctx),'monarch');
+  const newModels=template.find(item=>item.label==='Modelo').submenu;
+  assert.equal(newModels.filter(item=>item.label.includes('JoJo')).length,1);
+  assert.equal(newModels.filter(item=>item.label.includes('Solo Leveling')).length,1);
 });

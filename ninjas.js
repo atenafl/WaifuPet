@@ -24,7 +24,7 @@
     }
     if(pose==='eye'||pose==='swap'||pose==='charge'&&actor.attack==='kyubi'||pose==='seal'&&actor.attack==='rasenshuriken'&&['kurama-eternal','sixpaths-rinnegan'].includes(actor.form)) {
       const row=actor.character==='sasuke'?(pose==='swap'?3:2):(pose==='seal'?1:0);
-      return {atlas:'ninja-techniques',row,column:progress(age,.85)};
+      return {atlas:actor.character==='naruto'&&actor.form==='sixpaths-rinnegan'?'ninja-sixpaths-techniques':'ninja-techniques',row,column:progress(age,.85)};
     }
     if (['run', 'jump'].includes(pose)) { sequence = 0; column = Math.floor((actor.time || 0) * 10) % 4; }
     else if (['windup', 'punch', 'kick', 'low-kick', 'recover'].includes(pose)) {

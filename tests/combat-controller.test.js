@@ -135,3 +135,23 @@ test('Changing the enemy during fusion loading uses the latest opponent and unfu
   assert.equal(c.engine.opponent, 'broly'); assert.equal(c.engine.fusionPlan.mode.id, 'gogeta-blue');
   await c.unfuse(); assert.equal(c.engine.fusionPlan, null); assert.equal(c.engine.fusion, null);
 });
+
+test('Companion windows freeze on pause and cannot revive after model changes during asset loading',async()=>{
+ const {controller:c}=harness();c.setModel('sololeveling');await Promise.resolve();await c.selectCompanion('monarch');c.tick(.03);
+ assert.equal(c.windows.size,4);const positions=c.companions.actors.map(a=>a.x);
+ c.paused=true;c.tick(.03);assert.deepEqual(c.companions.actors.map(a=>a.x),positions);c.paused=false;
+ const pending=[];for(const w of c.windows.values())w.webContents.executeJavaScript=()=>new Promise(resolve=>pending.push(resolve));
+ const loading=c.selectCompanion('hunter'),old=[...c.windows.values()];
+ c.setModel('jojo');pending.forEach(resolve=>resolve({frames:{}}));await loading;
+ assert.ok(old.every(w=>w.destroyed));assert.equal(c.windows.size,2);assert.equal(c.companions.selection,'jonathan');
+ assert.equal(c.loadingForm,false);
+});
+test('Companion selection applies only the latest successful load and preserves the current selection on failure',async()=>{
+ const {controller:c}=harness();c.setModel('jojo');await Promise.resolve();await c.selectCompanion('jonathan');
+ const pending=[];for(const w of c.windows.values())w.webContents.executeJavaScript=()=>new Promise(resolve=>pending.push(resolve));
+ const first=c.selectCompanion('jotaro'),second=c.selectCompanion('jolyne');
+ pending[0]({frames:{}});pending[1]({frames:{}});await first;assert.equal(c.companions.selection,'jonathan');
+ pending[2]({frames:{}});pending[3]({frames:{}});await second;assert.equal(c.companions.selection,'jolyne');
+ for(const w of c.windows.values())w.webContents.executeJavaScript=async()=>null;
+ await c.selectCompanion('johnny');assert.equal(c.companions.selection,'jolyne');assert.equal(c.companions.automatic,false);
+});

@@ -31,9 +31,9 @@ const pick = (arr) => arr[(Math.random() * arr.length) | 0];
 
 const api = window.petAPI;
 
-const MODELS = ['waifu', 'webillo', 'saitama', 'dragonball', 'naruto', ...window.Titans.models];
+const MODELS = ['waifu', 'webillo', 'saitama', 'dragonball', 'naruto', ...window.Companions.models, ...window.Titans.models];
 const MODEL_NAME = { waifu: 'Waifu', webillo: 'Webillo', saitama: 'Saitama', dragonball: 'Goku y Vegeta',
-  attackontitan: 'Attack on Titan', naruto: 'Naruto y Sasuke', eren: 'Eren', armin: 'Armin', reiner: 'Reiner' };
+  attackontitan: 'Attack on Titan', naruto: 'Naruto y Sasuke', sololeveling:'Solo Leveling',jojo:'JoJo', eren: 'Eren', armin: 'Armin', reiner: 'Reiner' };
 let modelId = (() => {
   try {
     const saved = localStorage.getItem('pet.model');
@@ -783,6 +783,8 @@ function doAction(a) {
     case 'model:saitama': setModel('saitama'); break;
     case 'model:dragonball': setModel('dragonball'); break;
     case 'model:naruto': setModel('naruto'); break;
+    case 'model:sololeveling': setModel('sololeveling'); break;
+    case 'model:jojo': setModel('jojo'); break;
     case 'punch':
     case 'shop':
       if (modelId === 'saitama') setStateSay(a);
@@ -1617,7 +1619,7 @@ function pose() {
 function update(dt) {
   if (!paused && encounterHitStop > 0) { encounterHitStop = Math.max(0, encounterHitStop - dt); return; }
   if (!paused) time += dt;
-  if (!ready || modelId === 'dragonball' || modelId === 'naruto' || window.Titans.models.includes(modelId)) return;
+  if (!ready || modelId === 'dragonball' || modelId === 'naruto' || window.Companions.models.includes(modelId) || window.Titans.models.includes(modelId)) return;
   computeLayout();
   refreshWA();
   const dc = pickDisplay();

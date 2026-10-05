@@ -12,6 +12,7 @@ function render() {
   g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
   if (!frame) return;
   const f = frame;
+  if(f.kind==='companion-pet'){window.CompanionArt.render(g,f,w,h);return;}
   if (f.kind === 'ninja-pet' || f.kind === 'ninja-effects') {
     window.NinjaArt.render(g, f, w, h); return;
   }
@@ -132,6 +133,13 @@ function impact(g, age, color, point = { x: 0, y: -169 }) {
 }
 function hit(e) {
   if (!frame || frame.kind === 'beam' || frame.kind === 'ninja-effects' || frame.opacity < .1) return false;
+  if (frame.kind === 'companion-pet') {
+    const ratio=window.devicePixelRatio||1,x=Math.round(e.clientX*ratio),y=Math.round(e.clientY*ratio);
+    if(x<0||y<0||x>=canvas.width||y>=canvas.height)return false;
+    const left=Math.max(0,x-2),top=Math.max(0,y-2);
+    const pixels=g.getImageData(left,top,Math.min(5,canvas.width-left),Math.min(5,canvas.height-top)).data;
+    return pixels.some((value,index)=>index%4===3&&value>40);
+  }
   if (frame.kind === 'ninja-pet') {
     return Math.abs(e.clientX - (frame.originX ?? innerWidth / 2)) < frame.height * .4 && e.clientY > frame.foot - frame.height && e.clientY < frame.foot + 6;
   }

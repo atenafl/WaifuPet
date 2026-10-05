@@ -51,6 +51,10 @@ window.NinjaArt = (() => {
       return;
     }
     g.save(); g.translate(f.originX ?? width / 2, f.foot); g.globalAlpha = f.opacity;
+    if(f.form==='sixpaths-rinnegan'&&f.character==='naruto'&&!f.avatar){
+      g.fillStyle='#090c12';g.strokeStyle='#46506a';g.lineWidth=1;
+      for(let i=0;i<9;i++){const angle=-Math.PI*.7+i*Math.PI*1.4/8;g.beginPath();g.arc(-f.dir*f.height*(.26+.24*Math.cos(angle)),-f.height*(.6+.27*Math.sin(angle)),f.height*.027,0,Math.PI*2);g.fill();g.stroke();}
+    }
     if (f.pose === 'transform' || f.pose === 'charge' || ['red-mark', 'tail-curse', 'kurama-eternal', 'sixpaths-rinnegan'].includes(f.form)) {
       const pulse = f.pose === 'transform' ? Math.sin(Math.min(1, f.poseAge / 1.3) * Math.PI) : .28;
       const aura = g.createRadialGradient(0, -f.height * .55, 0, 0, -f.height * .55, f.height * .65);

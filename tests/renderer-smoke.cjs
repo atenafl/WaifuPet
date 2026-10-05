@@ -178,10 +178,53 @@ app.whenReady().then(async () => {
     const ninjaPositions=c.ninja.actors.map(a=>a.x); c.paused=true; c.tick(.04);
     assert.deepEqual(c.ninja.actors.map(a=>a.x),ninjaPositions); c.paused=false;
     c.ninja.setMode('roam'); c.tick(.03); assert.equal(c.ninja.projectile,null); assert.equal(c.windows.get('ninja-effects').isVisible(),false);
+    await win.webContents.executeJavaScript("doAction('model:sololeveling')");
+    for(let i=0;i<100&&!Array.from(c.windows.values()).every(w=>w.combatReady);i++)await wait(100);
+    clearInterval(c.timer);assert.equal(c.windows.size,4);await c.selectCompanion('monarch');
+    c.tick(.03);c.companions.summon();for(let i=0;i<100;i++)c.tick(1/30);await wait(70);
+    assert.ok(c.companions.actors.every(a=>a.active));
+    for(const w of c.windows.values())assert.ok(await w.webContents.executeJavaScript('canvas.getContext("2d").getImageData(0,0,canvas.width,canvas.height).data.some((v,i)=>i%4===3&&v>0)'));
+    let companionMenus=0;const mouseStates=[];
+    const heroWindow=c.windows.get('companion-hero');
+    const menuHandler=event=>{if(event.sender===heroWindow.webContents)companionMenus++;};
+    const ignoreHandler=(event,ignored)=>{if(event.sender===heroWindow.webContents)mouseStates.push(ignored);};
+    ipcMain.on('pet-menu',menuHandler);ipcMain.on('battle-ignore',ignoreHandler);
+    const clicked=await heroWindow.webContents.executeJavaScript(`(()=>{
+      const ratio=devicePixelRatio||1,pixels=g.getImageData(0,0,canvas.width,canvas.height).data;
+      let point=null;
+      for(let y=Math.floor((frame.foot-frame.height*.8)*ratio);y<(frame.foot-frame.height*.3)*ratio&&!point;y++){
+        for(let x=Math.floor((frame.originX-frame.height*.12)*ratio);x<(frame.originX+frame.height*.12)*ratio;x++){
+          if(x>=0&&y>=0&&pixels[(y*canvas.width+x)*4+3]>200){point={clientX:x/ratio,clientY:y/ratio};break;}
+        }
+      }
+      if(!point)return false;
+      const inside=hit(point),outside=hit({clientX:1,clientY:1});
+      window.dispatchEvent(new MouseEvent('mousemove',point));
+      document.dispatchEvent(new MouseEvent('contextmenu',{...point,button:2,bubbles:true,cancelable:true}));
+      window.dispatchEvent(new MouseEvent('mousemove',{clientX:1,clientY:1}));
+      return inside&&!outside;
+    })()`);
+    await wait(50);assert.ok(clicked);assert.equal(companionMenus,1);assert.deepEqual(mouseStates,[false,true]);
+    ipcMain.removeListener('pet-menu',menuHandler);ipcMain.removeListener('battle-ignore',ignoreHandler);
+    const companionPositions=c.companions.actors.map(a=>a.x);c.paused=true;c.tick(.04);
+    assert.deepEqual(c.companions.actors.map(a=>a.x),companionPositions);c.paused=false;
+    const shadowWindows=[...c.windows.values()];
+    await win.webContents.executeJavaScript("doAction('model:jojo')");
+    for(let i=0;i<100&&!Array.from(c.windows.values()).every(w=>w.combatReady);i++)await wait(100);
+    clearInterval(c.timer);assert.equal(c.windows.size,2);assert.ok(shadowWindows.every(w=>w.isDestroyed()));
+    for(const character of [...require('../companions').jojo,require('../companions').olderJoseph]){
+      await c.selectCompanion(character.id);c.tick(.03);c.companions.summon();for(let i=0;i<100;i++)c.tick(1/30);await wait(70);
+      const data=await c.windows.get('companion-hero').webContents.executeJavaScript('({selection:frame.selection,pixels:canvas.getContext("2d").getImageData(0,0,canvas.width,canvas.height).data.some((v,i)=>i%4===3&&v>0)})');
+      assert.equal(data.selection,character.id);assert.ok(data.pixels);
+      if(require('../companions').stands.some(s=>s.id===character.stand)){
+        assert.equal(c.companions.actors[1].character,character.stand);assert.ok(c.companions.actors[1].active,JSON.stringify({character:character.id,phase:c.companions.phase,age:c.companions.age,summonRequested:c.companions.summonRequested,companionAge:c.companions.companionAge,stand:c.companions.actors[1]}));
+        assert.ok(await c.windows.get('companion-stand').webContents.executeJavaScript('canvas.getContext("2d").getImageData(0,0,canvas.width,canvas.height).data.some((v,i)=>i%4===3&&v>0)'));
+      }else assert.equal(c.companions.actors[1].active,false);
+    }
     await win.webContents.executeJavaScript("doAction('model:webillo')"); await wait(200);
     assert.equal(c.windows.size, 0);
     assert.equal(errors.length, 0, errors.join('\n'));
-    process.stdout.write('PASS: Saitama, Dragon Ball, combined Attack on Titan, seven Naruto/Sasuke pairs, chakra charges and clashes, both projectiles, pause and cleanup; no renderer errors.\n');
+    process.stdout.write('PASS: Saitama, Dragon Ball, combined Attack on Titan, seven Naruto/Sasuke pairs and techniques, Solo Leveling with three shadows, all eight JoJo protagonists and stands, pause and cleanup; no renderer errors.\n');
   } catch (e) { process.stderr.write(e.stack + '\n'); resultCode = 1; }
   if (c) c.close(); if (win) win.destroy(); app.exit(resultCode);
 });

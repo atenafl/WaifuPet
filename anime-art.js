@@ -3,7 +3,7 @@
 window.AnimeArt = (() => {
   const atlases = new Map();
   const kind = new URLSearchParams(window.location.search).get('kind');
-  const files = ['naruto', 'sasuke'].includes(kind) ? [...window.Ninjas.groups.map(group => 'ninja-child-' + group), 'ninja-avatars', 'ninja-techniques'] : kind === 'ninja-effects' ? [] : ['eren', 'armin', 'reiner'].includes(kind) ? ['aot-' + kind + '-human', 'aot-' + kind + '-titan'] : kind === 'beam' ? [] : kind === 'monster' ? ['monsters'] : ['goku', 'vegeta'].includes(kind) ?
+  const files = kind?.startsWith('companion-') ? [] : ['naruto', 'sasuke'].includes(kind) ? [...window.Ninjas.groups.map(group => 'ninja-child-' + group), 'ninja-avatars', 'ninja-techniques'] : kind === 'ninja-effects' ? [] : ['eren', 'armin', 'reiner'].includes(kind) ? ['aot-' + kind + '-human', 'aot-' + kind + '-titan'] : kind === 'beam' ? [] : kind === 'monster' ? ['monsters'] : ['goku', 'vegeta'].includes(kind) ?
     [kind, 'super-saiyan'] : ['goku', 'vegeta', 'saitama', 'super-saiyan', 'monsters'];
   const anchors = { saitama: [[.72, .72, .72, .72], [.70, .70, .70, .70], [.71, .71, .64, .74], [.59, .69, .71, .74]],
     monsters: [[.39, .40, .53, .48], [.48, .48, .52, .70], [.52, .52, .57, .69], [.52, .52, .54, .69]] };
@@ -54,16 +54,15 @@ window.AnimeArt = (() => {
       context.drawImage(image, 0, 0);
       const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
       let extracted = components(pixels, canvas.width, canvas.height);
-      if(name.startsWith('ninja-') && extracted.count!==16) {
+      if((name.startsWith('ninja-') || name.startsWith('solo-') || name.startsWith('jojo-')) && extracted.count!==16) {
         for(const threshold of [80,128,180,220]) {
           extracted=components(pixels,canvas.width,canvas.height,threshold);
-
           if(extracted.count===16)break;
         }
       }
       const { figures, labels, count } = extracted;
       const cells = [];
-      if (figures.length !== 16 || ((name.startsWith('fusion-') || name.startsWith('aot-') || name.startsWith('ninja-')) && count !== 16)) {
+      if (figures.length !== 16 || ((name.startsWith('fusion-') || name.startsWith('aot-') || name.startsWith('ninja-') || name.startsWith('solo-') || name.startsWith('jojo-')) && count !== 16)) {
         console.error('La animación no contiene 16 personajes completos: ' + name); resolve(false); return;
       }
       for (let index = 0; index < 16; index++) {
@@ -85,7 +84,7 @@ window.AnimeArt = (() => {
         fc.putImageData(output, 0, 0);
         const anchor = anchors[name] ? anchors[name][row][column] : .5;
         let footCenter = 0, footSamples = 0;
-        if (name.startsWith('ninja-')) {
+        if (name.startsWith('ninja-') || name.startsWith('solo-') || name.startsWith('jojo-')) {
           for (let y = Math.floor(frame.height * .88); y < frame.height; y++) for (let x = 0; x < frame.width; x++) {
             if (output.data[(y * frame.width + x) * 4 + 3] > 180) { footCenter += x; footSamples++; }
           }
@@ -109,7 +108,7 @@ window.AnimeArt = (() => {
       const characterHeights = name.startsWith('ninja-') ? [cells[ninjaReference].image.height, cells[ninjaReference + 8].image.height] : name.startsWith('fusion-') && name !== 'fusion-ritual' ? [0, 8].map(offset =>
         cells.slice(offset, offset + 8).map(cell => cell.image.height).sort((a, b) => a - b)[4]) : null;
       const titanHeight = name.startsWith('aot-') ? cells.slice(8, 12).map(c => c.image.height).sort((a, b) => a - b)[2] : null;
-      atlases.set(name, { cells, height: titanHeight || (transformed ? heights[8] : image.naturalHeight / 4), characterHeights });
+      atlases.set(name, { cells, height: titanHeight || (transformed || name.startsWith('solo-') || name.startsWith('jojo-') ? heights[8] : image.naturalHeight / 4), characterHeights });
       resolve(true);
     };
     image.onerror = () => { console.error('No se pudo cargar la animación: ' + name); resolve(false); };
@@ -207,7 +206,7 @@ window.AnimeArt = (() => {
   }
   function ninja(g, p) { return draw(g, window.Ninjas.frame(p), p.height); }
   async function loadNinjaForm(form) {
-    const results = await Promise.all([...window.Ninjas.groups.map(group => load('ninja-' + form + '-' + group)), load('ninja-avatars'),load('ninja-techniques')]);
+    const results = await Promise.all([...window.Ninjas.groups.map(group => load('ninja-' + form + '-' + group)), load('ninja-avatars'),load('ninja-techniques'),...(form==='sixpaths-rinnegan'?[load('ninja-sixpaths-techniques')]:[])]);
     return results.every(Boolean);
   }
   function ninjaMeta(name, index) {
@@ -246,8 +245,16 @@ window.AnimeArt = (() => {
       for(let i=offset;i<offset+8;i++)frames[name+':'+i]=ninjaMeta(name,i);}
     for(let i=offset;i<offset+8;i++)frames['ninja-avatars:'+i]=ninjaMeta('ninja-avatars',i);
     for(let i=offset;i<offset+8;i++)frames['ninja-techniques:'+i]=ninjaMeta('ninja-techniques',i);
+    if(form==='sixpaths-rinnegan')for(let i=offset;i<offset+8;i++)frames['ninja-sixpaths-techniques:'+i]=ninjaMeta('ninja-sixpaths-techniques',i);
     return {frames,punch:ninjaPoint(form,character,'punch',.5),kick:ninjaPoint(form,character,'low-kick',.5),energy:ninjaPoint(form,character,'jutsu',.5)};
   }
-  return { ready, load, landmarks, ritualContact, chargePoint, draw, fighter, saitama, monster, titan, ninja, loadNinjaForm, ninjaLandmarks, ninjaPoint };
+  async function loadCompanionAssets(names) { return (await Promise.all(names.map(load))).every(Boolean); }
+  function companionLandmarks(names) {
+    const frames={};
+    for(const name of names){const atlas=atlases.get(name);if(!atlas)continue;
+      atlas.cells.forEach((cell,index)=>{frames[name+':'+index]={left:-cell.anchor/atlas.height,right:(cell.image.width-cell.anchor)/atlas.height,top:-cell.foot/atlas.height};});}
+    return {frames};
+  }
+  function companion(g,a){return draw(g,window.Companions.frame(a),a.height);}
+  return { ready, load, landmarks, ritualContact, chargePoint, draw, fighter, saitama, monster, titan, ninja, loadNinjaForm, ninjaLandmarks, ninjaPoint, loadCompanionAssets, companionLandmarks, companion };
 })();
-
