@@ -190,6 +190,24 @@ function showMenu() {
         { label: 'Aplaudir', click: () => send('clap') },
         { label: 'Taparse los ojos', click: () => send('peek') },
         { label: 'Caerse', click: () => send('fall') },
+        { label: 'Saltar a la comba', click: () => send('rope') },
+        { label: 'Girar el aro', click: () => send('hoop') },
+        { label: 'Barrer', click: () => send('broom') },
+        { label: 'Salir con paraguas', click: () => send('umbrella') },
+        { label: 'El globo', click: () => send('balloon') },
+        { label: 'Tocar la guitarra', click: () => send('guitar') },
+        { label: 'Abanico', click: () => send('fan') },
+        { label: 'Peinarse', click: () => send('brush') },
+        { label: 'Jugar al yoyo', click: () => send('yoyo') },
+        { label: 'Hacer una foto', click: () => send('camera') },
+        { label: 'Boxear', click: () => send('box') },
+        { label: 'Meditar', click: () => send('meditate') },
+        { label: 'Saltar en el sitio', click: () => send('jump') },
+        { label: 'Ponerse feliz', click: () => send('happy') },
+        { label: 'No hacer nada', click: () => send('idle') },
+        ...(model === 'tigresa'
+          ? [{ label: 'Sacar la katana', click: () => send('katana') }]
+          : []),
         { label: 'Despertar', click: () => send('wake') }
       ]
     },

@@ -165,6 +165,8 @@ const F = () => (winDipW || W) / W;
 const Fh = () => (winDipH || H) / H;
 let lastClick = 0;
 let noteT = 0;
+let boxPrev = 0;
+let actT = 0;
 let zzzT = 0;
 let smokeT = 0;
 let look = { x: 0, y: 0 };
@@ -196,6 +198,19 @@ const DUR = {
   clap: [3.5, 5],
   peek: [4, 6],
   fall: [2.2, 2.8],
+  katana: [9, 12],
+  rope: [7, 11],
+  hoop: [6, 9],
+  broom: [7, 11],
+  umbrella: [8, 12],
+  balloon: [6, 9],
+  guitar: [8, 12],
+  fan: [6, 9],
+  brush: [5, 8],
+  yoyo: [5, 8],
+  camera: [5, 8],
+  box: [5, 8],
+  meditate: [7, 11],
   happy: [2.7, 2.7]
 };
 
@@ -223,6 +238,19 @@ const PH = {
   spin: ['¡Gira, gira!', 'Giro de ballet~', '♪'],
   clap: ['¡Bravo!', '¡Muy bien hecho!', '¡Eres genio!'],
   peek: ['¿Ahí?', 'No quiero ver~', 'Qué susto...'],
+  katana: ['¡Mi katana!', 'Shing...', '¿La ves? Nya~'],
+  rope: ['¡Una, dos, tres!', 'Saltando la comba~', '¡No me la piso!'],
+  hoop: ['Gira, gira~', '¡El aro no cae!', 'Mira mi cintura'],
+  broom: ['A barrer esto...', 'Un poco de orden~', '¡Limpieza total!'],
+  umbrella: ['Que no te mojes~', 'Prrr, qué gotas', 'Bajo mi paraguas'],
+  balloon: ['Un globo para ti ♡', 'Flotando...', '¡Mira qué bonito!'],
+  guitar: ['♪ Esto es para ti~', 'Un rockcito...', '♪ Toco para vos'],
+  fan: ['Qué fresquito~', 'Un abaniquito...', 'Suspirando...'],
+  brush: ['Peinándome...', 'Un rizo aquí...', '¡Lista!'],
+  yoyo: ['¡Arriba y abajo!', 'Mira mi yoyo~', '¡Casi lo consigo!'],
+  camera: ['¡Sonrisa!', 'Para el álbum ♡', '¿Sale bien?'],
+  box: ['¡Toma y toma!', '¡Un, dos, un dos!', '¡K.O.!'],
+  meditate: ['Namasté...', 'En calma...', 'Respira hondo...'],
   happy: ['¡Miau! ♡', 'Nya~ ♡', '¡Qué rico!', 'Mmmh~ ♡'],
   surprise: ['¡Ay!', '¡Eek!'],
   wake: ['¿Mmm?', 'Ya despierta~']
@@ -252,6 +280,19 @@ const PH_TIG = {
   spin: ['¿Giro para ti~?', 'Mírame girar de cerca'],
   clap: ['¡Bravo... para mí!', 'Aplaude... más fuerte~'],
   peek: ['¿Buscas... a mí?', 'Te pillé mirando~'],
+  katana: ['¿Te gusta mi acero~?', 'Cuidado que corta...', 'Dulce... y mortal'],
+  rope: ['Salta conmigo~', '¿Te la pasas tú? ♡'],
+  hoop: ['Mira cómo gira...', 'No lo dejo caer... para ti'],
+  broom: ['¿Me ayudas a barrer?', 'Deja que lo haga yo~'],
+  umbrella: ['Quédate bajo mi paraguas~', 'Que no te enfiles ♡'],
+  balloon: ['Te regalo el globo ♡', 'Flota... como tú'],
+  guitar: ['Esta canción es tuya~', '¿Te gusta mi ritmo?'],
+  fan: ['Te abanico un poco~', 'Qué calor... conmigo'],
+  brush: ['¿Me peinas tú~?', 'Qué sedosa...'],
+  yoyo: ['Juega conmigo~', '¿Te lo pasas? ♡'],
+  camera: ['Sonríe conmigo~', 'Sal en la foto conmigo ♡'],
+  box: ['¡Púñale... con cariño!', '¡Ven a boxear conmigo!'],
+  meditate: ['Medita conmigo~', 'Cierra los ojos... conmigo'],
   happy: ['¡Miau! ♡ para ti', 'Ven a acariciarme ♡', 'Nya~ qué bien me tratas'],
   surprise: ['¡Eek! Me asustaste...', '¡Me quitaste el aire~'],
   wake: ['Buenos días... cariño~', '¿Me echabas de menos?']
@@ -655,7 +696,7 @@ function setStateSay(s) {
 }
 
 function chooseNext() {
-  const table = [
+  let table = [
     ['idle', 0.13],
     ['walk', 0.17],
     ['sit', 0.07],
@@ -677,8 +718,22 @@ function chooseNext() {
     ['spin', 0.04],
     ['clap', 0.05],
     ['peek', 0.04],
-    ['fall', 0.03]
+    ['fall', 0.03],
+    ['katana', 0.03],
+    ['rope', 0.05],
+    ['hoop', 0.03],
+    ['broom', 0.03],
+    ['umbrella', 0.03],
+    ['balloon', 0.03],
+    ['guitar', 0.03],
+    ['fan', 0.03],
+    ['brush', 0.03],
+    ['yoyo', 0.03],
+    ['camera', 0.03],
+    ['box', 0.03],
+    ['meditate', 0.03]
   ];
+  if (modelId !== 'tigresa') table = table.filter((e) => e[0] !== 'katana');
   let total = 0;
   for (const e of table) total += e[1];
   let r = Math.random() * total;
@@ -727,8 +782,11 @@ function doAction(a) {
       say(pick(PH.wake));
       meow('low');
       break;
+    case 'jump':
+      jump();
+      break;
     default:
-      if (DUR[a]) {
+      if (DUR[a] && !(a === 'katana' && modelId !== 'tigresa')) {
         setStateSay(a);
         meow(ACT_SND[a] || 'meow');
       }
@@ -763,9 +821,13 @@ const ACT_SND = {
   hop: 'short', jump: 'short', shiver: 'short', sneeze: 'short', peek: 'short',
   yawn: 'low', sleep: 'low', wake: 'low', coffee: 'low', smoke: 'low',
   cheer: 'big', dance: 'big', spin: 'big', clap: 'big', game: 'big', sing: 'big',
-  stretch: 'big', wave: 'big', happy: 'big',
-  read: 'purr', sit: 'purr',
-  phone: 'chirp', breakfast: 'chirp',
+  stretch: 'big', wave: 'big', happy: 'big', katana: 'big',
+  guitar: 'big', box: 'big',
+  read: 'purr', sit: 'purr', meditate: 'purr',
+  phone: 'chirp', breakfast: 'chirp', hoop: 'chirp', balloon: 'chirp',
+  fan: 'chirp', brush: 'chirp', yoyo: 'chirp',
+  rope: 'short', camera: 'short',
+  broom: 'meow', umbrella: 'low',
   fall: 'trip', walk: 'meow'
 };
 
@@ -854,6 +916,7 @@ function playThud() {
 }
 
 function hit(x, y) {
+  if (state === 'sleep') return Math.abs(x - W / 2) <= 134 && y >= GROUND - 140 && y <= GROUND;
   if (modelId === 'webillo') return Math.abs(x - W / 2) <= 150 && y >= GROUND - 272 && y <= GROUND;
   return Math.abs(x - W / 2) <= 76 && y >= GROUND - 246 && y <= GROUND;
 }
@@ -1043,10 +1106,12 @@ function spawnNotes(n) {
 }
 
 function spawnZ() {
+  // Tumbada: la Z sale de junto a la cara, sobre la almohada.
+  const h = state === 'sleep' && !drag ? lieHead() : null;
   parts.push({
     t: 'z',
-    x: W / 2 + rand(14, 30),
-    y: GROUND - 200,
+    x: W / 2 + (h ? h.x + rand(26, 50) : rand(14, 30)),
+    y: h ? GROUND + h.y - rand(26, 46) : GROUND - 200,
     vx: 16,
     vy: -26,
     g: -4,
@@ -1139,11 +1204,15 @@ function spawnButterfly() {
   });
 }
 
-function spawnBang() {
+// Chispazo. Sin argumentos sale a la altura de la cabeza; con la posición de
+// un puñetazo (coordenadas de escena) sale justo en el impacto.
+function spawnBang(fx, fy) {
+  const bx = fx === undefined ? rand(-26, 26) : fx;
+  const by = fy === undefined ? -rand(205, 235) : fy;
   parts.push({
     t: 'bang',
-    x: W / 2 + rand(-26, 26),
-    y: GROUND - rand(205, 235),
+    x: W / 2 + bx,
+    y: GROUND + by,
     vx: rand(-6, 6),
     vy: -74,
     g: 50,
@@ -1340,6 +1409,25 @@ function drawParts() {
 
 // ---------- update ----------
 
+// Postura tumbada del estado "sleep": el cuerpo rota 90° y queda echado en la
+// cama. x/y es la cadera (pivote) en marco del suelo, headDX separa la cabeza
+// del eje para apoyarla en la almohada y headDY la acerca al cuerpo.
+const SLEEP_LIE = {
+  tigresa: { x: 86, y: -53, scale: 1, headDX: 28, headDY: 24 },
+  webillo: { x: 86, y: -53, scale: 1, headDX: 0, headDY: 0 }
+};
+
+function lieOf() {
+  return SLEEP_LIE[modelId] || SLEEP_LIE.tigresa;
+}
+
+// Centro de la cabeza (marco del suelo) con la mascota tumbada.
+function lieHead() {
+  const L = lieOf();
+  const hy = modelId === 'webillo' ? faceY() : HEAD_Y + L.headDY;
+  return { x: L.x + L.scale * hy, y: L.y - L.scale * (L.headDX || 0) };
+}
+
 function pose() {
   if (drag) {
     return { shift: 0, legs: 'dangle', arms: 'up', prop: null, headDY: 0, tilt: -0.05, irisDy: 0, bob: 0 };
@@ -1367,8 +1455,14 @@ function pose() {
       return { shift: 0, legs: 'stand', arms: 'dance', prop: null, headDY: 2, tilt: -0.03, irisDy: 0, bob: Math.abs(Math.sin(time * 5)) * 3 };
     case 'game':
       return { shift: 0, legs: 'stand', arms: 'hold', prop: 'pad', headDY: 7, tilt: 0.13, irisDy: 5, bob: 0 };
-    case 'sleep':
-      return { shift: 34, legs: 'curl', arms: 'curl', prop: null, headDY: 24, tilt: 0.32, irisDy: 0, bob: Math.abs(Math.sin(time * 1.6)) * 1.5 };
+    case 'sleep': {
+      const L = lieOf();
+      return {
+        shift: 0, legs: 'lie', arms: 'lie', prop: null,
+        headDY: L.headDY, headDX: L.headDX, tilt: -0.1, irisDy: 0,
+        bob: Math.abs(Math.sin(time * 1.6)) * 1.5
+      };
+    }
     case 'happy':
       return { shift: 0, legs: 'stand', arms: 'up', prop: null, headDY: 0, tilt: -0.07, irisDy: 0, bob: Math.abs(Math.sin(time * 6)) * 2 };
     case 'wave':
@@ -1389,6 +1483,32 @@ function pose() {
       return { shift: 0, legs: 'stand', arms: 'clap', prop: null, headDY: 0, tilt: 0.02, irisDy: 0, bob: Math.abs(Math.sin(phase)) * 2 };
     case 'peek':
       return { shift: 4, legs: 'stand', arms: 'peek', prop: null, headDY: 3, tilt: 0.06, irisDy: 2, bob: 0 };
+    case 'katana':
+      return { shift: 0, legs: 'stand', arms: 'katana', prop: null, headDY: 0, tilt: 0.02, irisDy: 1, bob: 0 };
+    case 'rope':
+      return { shift: 0, legs: 'jump', arms: 'rope', prop: null, headDY: -1, tilt: 0, irisDy: 0, bob: 34 * ropeJump() };
+    case 'hoop':
+      return { shift: 0, legs: 'stand', arms: 'up', prop: null, headDY: 0, tilt: Math.sin(time * 5) * 0.07, irisDy: 1, bob: Math.abs(Math.sin(time * 5)) * 2 };
+    case 'broom':
+      return { shift: 0, legs: 'stand', arms: 'broom', prop: 'broom', headDY: 2, tilt: Math.sin(time * 2.4) * 0.05, irisDy: 1, bob: 0 };
+    case 'umbrella':
+      return { shift: 0, legs: 'stand', arms: 'umb', prop: 'umbrella', headDY: 1, tilt: -0.02, irisDy: 0, bob: Math.abs(Math.sin(time * 1.7)) * 1.5 };
+    case 'balloon':
+      return { shift: 0, legs: 'stand', arms: 'hold', prop: 'balloon', headDY: -2, tilt: -0.04, irisDy: -1, bob: Math.sin(time * 1.6) * 1.5 };
+    case 'guitar':
+      return { shift: 0, legs: 'stand', arms: 'guitar', prop: 'guitar', headDY: 3, tilt: 0.06, irisDy: 2, bob: Math.abs(Math.sin(time * 5)) * 2 };
+    case 'fan':
+      return { shift: 0, legs: 'stand', arms: 'fan', prop: 'fan', headDY: -1, tilt: -0.03, irisDy: 0, bob: Math.sin(time * 1.9) * 1.5 };
+    case 'brush':
+      return { shift: 0, legs: 'stand', arms: 'brush', prop: 'brush', headDY: -1, tilt: 0.04, irisDy: 0, bob: 0 };
+    case 'yoyo':
+      return { shift: 0, legs: 'stand', arms: 'hold', prop: 'yoyo', headDY: 4, tilt: 0.06, irisDy: 3, bob: 0 };
+    case 'camera':
+      return { shift: 0, legs: 'stand', arms: 'camera', prop: 'camera', headDY: 1, tilt: -0.03, irisDy: 0, bob: 0 };
+    case 'box':
+      return { shift: 0, legs: 'stand', arms: 'box', prop: null, headDY: 3, tilt: Math.sin(time * 8) * 0.04, irisDy: 2, bob: Math.abs(Math.sin(time * 8)) * 3 };
+    case 'meditate':
+      return { shift: 32, legs: 'sit', arms: 'zen', prop: null, headDY: -2, tilt: 0, irisDy: 2, bob: Math.sin(time * 1.4) * 1.5 };
     default:
       return { shift: 0, legs: 'stand', arms: 'rest', prop: null, headDY: 0, tilt: 0, irisDy: 0, bob: Math.sin(time * 1.8) * 1.2 };
   }
@@ -1566,6 +1686,20 @@ function update(dt) {
           lastHopS = h;
           break;
         }
+        case 'rope': {
+          const j = ropeJump();
+          if (lastHopS !== null && lastHopS > 0 && j <= 0) spawnDust(2);
+          lastHopS = j;
+          break;
+        }
+        case 'box': {
+          // El chispazo sale justo cuando el puñetazo llega a tope.
+          const q = boxPhase(time);
+          if (boxPrev < 0.85 && q >= 0.85) spawnBang(68, -122);
+          else if (boxPrev > 0.15 && q <= 0.15) spawnBang(-68, -122);
+          boxPrev = q;
+          break;
+        }
         case 'spin': {
           if (!stateFired) {
             stateFired = true;
@@ -1620,11 +1754,20 @@ function update(dt) {
           // La tigresa vapea: nubes gordas y continuas.
           smokeT = modelId === 'tigresa' ? rand(0.16, 0.3) : rand(0.3, 0.5);
         }
-      } else if (state === 'sing') {
+      } else if (state === 'sing' || state === 'guitar') {
         noteT -= dt;
         if (noteT <= 0) {
           spawnNotes(1);
           noteT = rand(0.55, 1.1);
+        }
+      }
+
+      if (state === 'camera' || state === 'brush' || state === 'meditate') {
+        actT -= dt;
+        if (actT <= 0) {
+          if (state === 'camera') spawnHearts(2);
+          else spawnSparkles(state === 'meditate' ? 1 : 2);
+          actT = rand(1.1, 2);
         }
       }
 
@@ -1729,14 +1872,19 @@ function rrect(x, y, w, h, r, fill, lw, strokeCol) {
 
 // ---------- body parts ----------
 
-function drawShadow(a) {
+function drawShadow(a, lie) {
   const up = Math.max(0, a);
   const k = clamp(1 - up / 180, 0.35, 1);
   ctx.save();
   ctx.globalAlpha = (modelId === 'webillo' ? 0.24 : 0.2) * k;
   ctx.fillStyle = modelId === 'webillo' ? '#17383b' : modelId === 'tigresa' ? '#5a2410' : '#3a2c66';
   ctx.beginPath();
-  ctx.ellipse(W / 2 - (modelId === 'webillo' ? 15 : 0), GROUND + up - 1, (modelId === 'webillo' ? 66 : 40) * k, (modelId === 'webillo' ? 8 : 6.5) * k, 0, 0, TAU);
+  if (lie) {
+    // Tumbada: la sombra se estira bajo toda la cama.
+    ctx.ellipse(W / 2 - 4, GROUND + up - 1, 134 * k, 8 * k, 0, 0, TAU);
+  } else {
+    ctx.ellipse(W / 2 - (modelId === 'webillo' ? 15 : 0), GROUND + up - 1, (modelId === 'webillo' ? 66 : 40) * k, (modelId === 'webillo' ? 8 : 6.5) * k, 0, 0, TAU);
+  }
   ctx.fill();
   ctx.restore();
 }
@@ -1746,6 +1894,7 @@ function drawTail(t) {
   const puff = state === 'shiver' ? 1.35 : 1;
   const sw = Math.sin(t * fast);
   const curled = pose().legs === 'curl';
+  const lying = pose().legs === 'lie';
   const tiger = modelId === 'tigresa';
   ctx.lineCap = 'round';
   let ex, ey;
@@ -1755,6 +1904,11 @@ function drawTail(t) {
     ctx.bezierCurveTo(-44, -44, -20, -4, 24, -16);
     ex = 24;
     ey = -16;
+  } else if (lying) {
+    // Tumbada: la cola se estira sobre la manta y asoma por el pie de la cama.
+    ctx.bezierCurveTo(-20, -26, -4, 18, -13, 52);
+    ex = -13;
+    ey = 52;
   } else {
     ctx.quadraticCurveTo(-48 + sw * 10, -76 + sw * 6, -64 + sw * 15, -108 + Math.cos(t * fast * 0.7) * 10);
     ex = -64 + sw * 15;
@@ -1821,45 +1975,90 @@ function drawBackHair() {
   fillStroke(COL.hairDark, 2.4);
 }
 
-// Katana ceñida a la espalda en diagonal: asoma por encima del hombro y por
-// debajo de la cadera, entre la melena y el cuerpo.
-function drawKatana() {
-  const x0 = -52, y0 = -140; // pomo (kashira), sobre el hombro izquierdo
-  const x1 = 48, y1 = -26;   // punta (kissaki), asomando a la cadera derecha
-  const dx = x1 - x0, dy = y1 - y0;
-  const pl = Math.hypot(dx, dy);
-  const nx = -dy / pl, ny = dx / pl;
-  const at = (t, off) => [x0 + dx * t + nx * off, y0 + dy * t + ny * off];
-  const bowOf = (t) => Math.sin(t * Math.PI) * 5.5;
-  const path = (from, to, off) => {
-    ctx.beginPath();
-    let p = at(from, bowOf(from) + off);
-    ctx.moveTo(p[0], p[1]);
-    for (let t = from + 0.08; t < to; t += 0.08) {
-      p = at(t, bowOf(t) + off);
-      ctx.lineTo(p[0], p[1]);
-    }
-    p = at(to, bowOf(to) + off);
-    ctx.lineTo(p[0], p[1]);
-  };
+// --- Katana --------------------------------------------------------------
+// Geometría en coordenadas del cuerpo (y = 0 es el suelo). El pomo es el
+// origen de la hoja; la funda va de t=0.2 (boca) a t=1 (punta).
+const KAT_P0 = [-52, -140]; // pomo (kashira), sobre el hombro izquierdo
+const KAT_D = [48 - KAT_P0[0], -26 - KAT_P0[1]]; // hasta la punta fundada
+const KAT_L = Math.hypot(KAT_D[0], KAT_D[1]);
+const KAT_U = [KAT_D[0] / KAT_L, KAT_D[1] / KAT_L]; // eje de la hoja
+const KAT_N = [-KAT_U[1], KAT_U[0]];
+// Giro que deja la hoja horizontal con la punta hacia la derecha.
+const KAT_FLAT = -Math.atan2(KAT_D[1], KAT_D[0]);
+const katAt = (t, off) => [
+  KAT_P0[0] + KAT_D[0] * t + KAT_N[0] * off,
+  KAT_P0[1] + KAT_D[1] * t + KAT_N[1] * off
+];
+const katBow = (t) => Math.sin(t * Math.PI) * 5.5;
 
+function katPath(from, to, off) {
+  ctx.beginPath();
+  let p = katAt(from, katBow(from) + off);
+  ctx.moveTo(p[0], p[1]);
+  for (let t = from + 0.08; t < to; t += 0.08) {
+    p = katAt(t, katBow(t) + off);
+    ctx.lineTo(p[0], p[1]);
+  }
+  p = katAt(to, katBow(to) + off);
+  ctx.lineTo(p[0], p[1]);
+}
+
+// Hoja de acero: solo se pinta al desenvainar, al ir por debajo de la funda.
+// `to` corta la punta: en la capa de atrás se queda en 1 (tapada por la funda
+// con su tulipa redonda) y delante se pinta con la punta afilada (1.06).
+function drawKatanaBlade(to = 1.06) {
+  const side = (s) => {
+    const pts = [];
+    for (let t = 0.2; t <= to + 1e-6; t += 0.06) {
+      const w = Math.max(0.3, 2.7 - 1.3 * ((t - 0.2) / 0.8));
+      pts.push(katAt(t, katBow(t) + s * w));
+    }
+    return pts;
+  };
+  const a = side(1);
+  const b = side(-1).reverse();
+  const tip = katAt(to, katBow(Math.min(to, 1)));
+  ctx.beginPath();
+  ctx.moveTo(a[0][0], a[0][1]);
+  for (let i = 1; i < a.length; i++) ctx.lineTo(a[i][0], a[i][1]);
+  ctx.lineTo(tip[0], tip[1]);
+  for (const p of b) ctx.lineTo(p[0], p[1]);
+  ctx.closePath();
+  ctx.fillStyle = '#e7edf3';
+  ctx.fill();
+  ctx.strokeStyle = '#4d5762';
+  ctx.lineWidth = 1.3;
+  ctx.stroke();
+  const e = side(-1);
+  ctx.beginPath();
+  ctx.moveTo(e[0][0], e[0][1]);
+  for (let i = 1; i < e.length; i++) ctx.lineTo(e[i][0], e[i][1]);
+  ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+  ctx.lineWidth = 1.7;
+  ctx.stroke();
+}
+
+// Saya (funda) lacada negra.
+function drawKatanaSaya() {
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-
-  // Saya (fundas) lacada negra.
-  path(0.2, 1, 0);
+  katPath(0.2, 1, 0);
   ctx.strokeStyle = '#161219';
   ctx.lineWidth = 9.5;
   ctx.stroke();
   // Brillo del lacre.
-  path(0.25, 0.96, -2.7);
+  katPath(0.25, 0.96, -2.7);
   ctx.strokeStyle = 'rgba(255,255,255,0.16)';
   ctx.lineWidth = 2.2;
   ctx.stroke();
+}
 
-  // Tsuka (empuñadura) con tsukamaki (entrelazado).
-  const hEnd = at(0.2, bowOf(0.2));
-  const hStart = at(0, bowOf(0));
+// Tsuka (empuñadura) con tsukamaki, kashira y tsuba: siempre con la hoja.
+function drawKatanaTsuka() {
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  const hEnd = katAt(0.2, katBow(0.2));
+  const hStart = katAt(0, katBow(0));
   ctx.beginPath();
   ctx.moveTo(hStart[0], hStart[1]);
   ctx.lineTo(hEnd[0], hEnd[1]);
@@ -1870,23 +2069,20 @@ function drawKatana() {
   ctx.lineWidth = 2;
   for (let i = 1; i <= 5; i++) {
     const t = (i / 6) * 0.2;
-    const c = at(t, bowOf(t));
+    const c = katAt(t, katBow(t));
     const dir = i % 2 ? 1 : -1;
     ctx.beginPath();
-    ctx.moveTo(c[0] + nx * 3.6, c[1] + ny * 3.6);
-    ctx.lineTo(c[0] + nx * 3.6 - dx / pl * 4 * dir, c[1] + ny * 3.6 - dy / pl * 4 * dir);
+    ctx.moveTo(c[0] + KAT_N[0] * 3.6, c[1] + KAT_N[1] * 3.6);
+    ctx.lineTo(c[0] + KAT_N[0] * 3.6 - KAT_U[0] * 4 * dir,
+      c[1] + KAT_N[1] * 3.6 - KAT_U[1] * 4 * dir);
     ctx.stroke();
   }
-
-  // Kashira (pomo).
-  const k = at(0.01, 0);
+  const k = katAt(0.01, 0);
   ell(k[0], k[1], 3.8, 3.8, '#161219', 1.6);
-
-  // Tsuba (guardamano) dorado.
-  const g = at(0.2, bowOf(0.2));
+  const g = katAt(0.2, katBow(0.2));
   ctx.save();
   ctx.translate(g[0], g[1]);
-  ctx.rotate(Math.atan2(dy, dx));
+  ctx.rotate(Math.atan2(KAT_D[1], KAT_D[0]));
   ctx.beginPath();
   ctx.ellipse(0, 0, 2.4, 7.5, 0, 0, TAU);
   ctx.fillStyle = '#c9a227';
@@ -1897,41 +2093,124 @@ function drawKatana() {
   ctx.restore();
 }
 
-// Cama que aparece debajo de la mascota mientras duerme (marco del suelo).
-function drawBed() {
-  // Cabecero
-  rrect(-66, -46, 9, 44, 3, '#7c4a2d', 2.4, '#4a2a18');
-  // Estructura de madera
-  rrect(-64, -9, 128, 9, 3, '#7c4a2d', 2.4, '#4a2a18');
-  // Colchón
-  rrect(-62, -19, 124, 11, 5, '#f4ecdf', 2.4, '#c9b99f');
-  // Almohada
+// Katana ceñida a la espalda en diagonal: asoma por encima del hombro y por
+// debajo de la cadera, entre la melena y el cuerpo.
+function drawKatana() {
+  drawKatanaSaya();
+  drawKatanaTsuka();
+}
+
+// Coloca la hoja (junto con la empuñadura) con el pomo en (fx,fy) y giro `ang`.
+function withBlade(fx, fy, ang, fn) {
   ctx.save();
-  ctx.translate(-46, -25);
-  ctx.rotate(-0.08);
-  ctx.beginPath();
-  ctx.ellipse(0, 0, 17, 6.5, 0, 0, TAU);
-  fillStroke('#fdf8ef', 2.2, '#c9b99f');
+  ctx.translate(fx, fy);
+  ctx.rotate(ang);
+  ctx.translate(-KAT_P0[0], -KAT_P0[1]);
+  fn();
   ctx.restore();
 }
 
-// Manta que cubre la mitad inferior del cuerpo dormido (marco del suelo).
+// Secuencia de la acción 'katana': la funda queda ceñida a la espalda y la
+// hoja sale deslizándose por su propio eje (izquierda tirando de la
+// empuñadura, derecha sujetando la boca de la funda): nunca la atraviesa.
+// Después los brazos se avanzan al otro lado y la hoja queda apuntando, y
+// vuelve a fundar por el mismo camino. `front` decide en qué capa se pinta
+// la hoja; la funda nunca sale de la espalda.
+function katAnim() {
+  const p = clamp(st / dur, 0, 1);
+  const sm = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+  const L = (a, b, t) => a + (b - a) * t;
+  const mix = (A, B, t) => A.map((v, i) => L(v, B[i], t));
+  const S_MAX = 40;                        // recorrido de la hoja por el eje
+  // Pose final: brazos avanzados al otro lado (delante del pecho, hacia la
+  // derecha) y la hoja apuntando hacia arriba, en vez de quedarse a la
+  // izquierda, por donde se ha desenvainado.
+  const FRONT = [14, -104, KAT_FLAT - 0.06];
+  const MOUTH = [-32, -117];               // boca de la funda
+  const REST_L = [-25, -72], REST_R = [25, -72];
+
+  // s: cuánto ha salido la hoja por el eje de la funda (0 = fundada).
+  let s = 0;
+  if (p >= 0.14 && p < 0.46) s = S_MAX * sm((p - 0.14) / 0.32);           // sacar
+  else if (p >= 0.46 && p < 0.88) s = S_MAX;                               // fuera
+  else if (p >= 0.88 && p < 0.97) s = S_MAX * (1 - sm((p - 0.88) / 0.09)); // meter
+
+  // sw: 0 = la hoja sigue alineada con la funda, 1 = pose delante del cuerpo.
+  let sw = 0;
+  if (p >= 0.52 && p < 0.66) sw = sm((p - 0.52) / 0.14);
+  else if (p >= 0.66 && p < 0.78) sw = 1;
+  else if (p >= 0.78 && p < 0.88) sw = 1 - sm((p - 0.78) / 0.10);
+
+  const drawn = [KAT_P0[0] - KAT_U[0] * s, KAT_P0[1] - KAT_U[1] * s, 0];
+  const [bx, by, ang] = mix(drawn, FRONT, sw);
+  // El giro no va en línea recta: se hunde hacia el pecho para que las manos
+  // no pasen pegadas a los hombros (los brazos se quedarían en hueso).
+  const arc = Math.sin(sw * Math.PI);
+  const fx = bx + arc * 26, fy = by + arc * 70;
+  const ca = Math.cos(ang), sa = Math.sin(ang);
+  const loc = (lx, ly) => [fx + lx * ca - ly * sa, fy + lx * sa + ly * ca];
+  const holdL = loc(KAT_D[0] * 0.06, KAT_D[1] * 0.06); // izquierda, en la empuñadura
+  const grip = loc(KAT_D[0] * 0.18, KAT_D[1] * 0.18);  // derecha, junto a la tsuba
+
+  // Izquierda: agarra la empuñadura, tira de ella (desenvaina) y vuelve.
+  const tL = p < 0.05 ? 0 : p < 0.14 ? sm((p - 0.05) / 0.09)
+    : p < 0.97 ? 1 : 1 - sm((p - 0.97) / 0.03);
+  const hL = [L(REST_L[0], holdL[0], tL), L(REST_L[1], holdL[1], tL)];
+
+  // Derecha: sujeta la boca de la funda mientras se desenvaina y se funda.
+  let hR = REST_R;
+  if (p >= 0.05 && p < 0.14) hR = mix(REST_R, MOUTH, sm((p - 0.05) / 0.09));
+  else if (p >= 0.14 && p < 0.52) hR = MOUTH;
+  else if (p >= 0.52 && p < 0.60) hR = mix(MOUTH, grip, sm((p - 0.52) / 0.08));
+  else if (p >= 0.60 && p < 0.78) hR = grip;
+  else if (p >= 0.78 && p < 0.86) hR = mix(grip, MOUTH, sm((p - 0.78) / 0.08));
+  else if (p >= 0.86 && p < 0.97) hR = MOUTH;
+  else if (p >= 0.97) hR = mix(MOUTH, REST_R, sm((p - 0.97) / 0.03));
+
+  return { p, s, sw, fx, fy, ang, hL, hR, front: sw > 0 };
+}
+
+// Cama que aparece debajo de la mascota mientras duerme (marco del suelo).
+// Medida para el cuerpo tumbado: de -134 (cabecero) a 128 (pie).
+function drawBed() {
+  // Cabecero
+  rrect(-134, -58, 12, 58, 4, '#7c4a2d', 2.4, '#4a2a18');
+  // Estructura de madera
+  rrect(-122, -10, 250, 10, 3, '#7c4a2d', 2.4, '#4a2a18');
+  // Colchón
+  rrect(-120, -26, 238, 16, 6, '#f4ecdf', 2.4, '#c9b99f');
+  // Almohada (más ancha que la cabeza, asoma por los lados)
+  ctx.save();
+  ctx.translate(-62, -25);
+  ctx.rotate(-0.05);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 52, 10, 0, 0, TAU);
+  fillStroke('#fdf8ef', 2.2, '#c9b99f');
+  ctx.restore();
+  // Pie de la cama
+  rrect(116, -34, 11, 34, 3, '#7c4a2d', 2.4, '#4a2a18');
+}
+
+// Manta que cubre el cuerpo dormido, del pecho al pie de la cama.
 function drawBlanket() {
   ctx.beginPath();
-  ctx.moveTo(-44, -23);
-  ctx.quadraticCurveTo(-14, -30, 16, -26);
-  ctx.quadraticCurveTo(42, -23, 62, -26);
-  ctx.lineTo(62, -1);
-  ctx.quadraticCurveTo(61, 2, 57, 1);
-  ctx.lineTo(-40, 1);
-  ctx.quadraticCurveTo(-44, 1, -44, -3);
+  ctx.moveTo(-12, -6);
+  ctx.lineTo(-12, -58);
+  ctx.quadraticCurveTo(-4, -76, 34, -76);
+  ctx.quadraticCurveTo(66, -60, 96, -36);
+  ctx.quadraticCurveTo(110, -30, 116, -28);
+  ctx.lineTo(116, -8);
+  ctx.quadraticCurveTo(115, -3, 109, -4);
+  ctx.lineTo(-6, -4);
+  ctx.quadraticCurveTo(-12, -4, -12, -6);
   ctx.closePath();
   fillStroke('#d99a3f', 2.4, '#8a5a1c');
   // Rizo claro del borde superior
   ctx.beginPath();
-  ctx.moveTo(-44, -23);
-  ctx.quadraticCurveTo(-14, -30, 16, -26);
-  ctx.quadraticCurveTo(42, -23, 62, -26);
+  ctx.moveTo(-12, -58);
+  ctx.quadraticCurveTo(-4, -76, 34, -76);
+  ctx.quadraticCurveTo(66, -60, 96, -36);
+  ctx.quadraticCurveTo(110, -30, 116, -28);
   ctx.strokeStyle = '#efc47e';
   ctx.lineWidth = 3.4;
   ctx.lineCap = 'round';
@@ -1959,12 +2238,21 @@ function drawLegs(t, mode) {
       ky = -58;
       fx = 27 * s;
       fy = -34;
+    } else if (mode === 'lie') {
+      // Tumbada: las piernas se extienden hacia delante (eje Y local = eje X
+      // de pantalla) y caen hasta apoyarse en el colchón (X local negativo).
+      fx = s > 0 ? -24 : -34;
+      fy = s > 0 ? 20 : 24;
     } else if (mode === 'dangle') {
       fx = 11 * s + Math.sin(t * 6 + i * 2) * 3;
       fy = -16;
     } else if (mode === 'hop') {
       fx = 6 * s;
       fy = -Math.max(0, Math.sin(phase)) * 9;
+    } else if (mode === 'jump') {
+      // Saltos de la comba: las patas se recogen justo cuando está en el aire.
+      fx = 6 * s;
+      fy = -ropeJump() * 10;
     }
 
     if (mode === 'curl') {
@@ -2187,6 +2475,17 @@ function drawTigresaBody(t) {
   ctx.stroke();
 }
 
+// Ritmo de los puñetazos: 0 = golpe con la mano izquierda, 1 = con la
+// derecha. Seco: el puño sale de golpe, se queda un instante a tope (el
+// impacto) y vuelve a la guardia, con pausa antes del siguiente. Los topes
+// caen justo en los máximos de sin(t*8), así el bamboleo y la inclinación
+// de la cabeza van con los golpes.
+function boxPhase(t) {
+  const v = ((t * 8) / TAU + 0.05) % 1;
+  const x = v < 0.3 ? v / 0.3 : v < 0.5 ? 1 : v < 0.8 ? 1 - (v - 0.5) / 0.3 : 0;
+  return x * x * (3 - 2 * x);
+}
+
 function armConfig(pz, t) {
   const rest = (s) => ({ sign: s, hx: 25 * s, hy: -72 });
   switch (pz.arms) {
@@ -2242,6 +2541,64 @@ function armConfig(pz, t) {
         { sign: 1, hx: 15, hy: ey }
       ];
     }
+    case 'katana': {
+      const k = katAnim();
+      return [
+        { sign: -1, hx: k.hL[0], hy: k.hL[1] },
+        { sign: 1, hx: k.hR[0], hy: k.hR[1] }
+      ];
+    }
+    case 'rope':
+      // Manos a la altura de las caderas sujetando las empuñaduras.
+      return [
+        { sign: -1, hx: -50, hy: -64 },
+        { sign: 1, hx: 50, hy: -64 }
+      ];
+    case 'broom': {
+      const sw = Math.sin(t * 2.4) * 0.1;
+      return [
+        { sign: -1, hx: 8 + sw * 30, hy: -75 - sw * 8 },
+        { sign: 1, hx: 32 + sw * 30, hy: -111 - sw * 8 }
+      ];
+    }
+    case 'umb':
+      return [rest(-1), { sign: 1, hx: 34, hy: -110 }];
+    case 'guitar': {
+      const st = Math.abs(Math.sin(t * 7));
+      return [
+        { sign: -1, hx: -36, hy: -115 },
+        { sign: 1, hx: 14 + Math.sin(t * 7) * 3, hy: -86 + st * 5 }
+      ];
+    }
+    case 'fan':
+      return [
+        rest(-1),
+        { sign: 1, hx: 34 + Math.sin(t * 8) * 6, hy: -108 + Math.cos(t * 8) * 5 }
+      ];
+    case 'brush':
+      return [
+        rest(-1),
+        { sign: 1, hx: 46 + Math.sin(t * 6) * 4, hy: -156 + Math.cos(t * 6) * 6 }
+      ];
+    case 'camera':
+      return [rest(-1), { sign: 1, hx: 54, hy: -126 }];
+    case 'box': {
+      // Guardia arriba, contra las mejillas, y el golpe sale recto hacia
+      // fuera. Cada mano se queda en su lado, así que el brazo nunca se
+      // encoja pasando por el hombro.
+      const q = boxPhase(t);
+      const m = (a, b) => a + (b - a) * q;
+      return [
+        { sign: -1, hx: m(-62, -24), hy: m(-122, -132) },
+        { sign: 1, hx: m(24, 62), hy: m(-132, -122) }
+      ];
+    }
+    case 'zen':
+      // Manos apoyadas sobre las rodillas, palmas arriba.
+      return [
+        { sign: -1, hx: -36, hy: -46 },
+        { sign: 1, hx: 36, hy: -46 }
+      ];
     case 'hold':
       if (pz.prop === 'book') return [{ sign: -1, hx: 6, hy: -92 }, { sign: 1, hx: 27, hy: -94 }];
       if (pz.prop === 'toast' || pz.prop === 'pad') return [{ sign: -1, hx: 6, hy: -92 }, { sign: 1, hx: 27, hy: -94 }];
@@ -2249,6 +2606,9 @@ function armConfig(pz, t) {
       return [rest(-1), { sign: 1, hx: 26, hy: -106 }];
     case 'curl':
       return [{ sign: -1, hx: -17, hy: -60 }, { sign: 1, hx: 17, hy: -60 }];
+    case 'lie':
+      // Brazo cercano tumbado sobre la manta; el lejano queda bajo el cuerpo.
+      return [{ sign: -1, hx: -6, hy: -70 }, { sign: 1, hx: 14, hy: -58 }];
     default:
       return [rest(-1), rest(1)];
   }
@@ -2294,18 +2654,44 @@ function drawArm(a) {
   const ey = (sy + a.hy) / 2 + 4;
   limb(sx, sy, a.hx, a.hy, ex, ey, COL.skin, 11.5, 8.2);
   if (modelId === 'tigresa') limbStripes(sx, sy, a.hx, a.hy, 2);
-  ell(a.hx, a.hy, 6.5, 6.5, COL.skin, 2);
+  drawPaw(a.hx, a.hy, Math.atan2(a.hy - sy, a.hx - sx), state === 'box');
+}
+
+// Mano con garritas: se redibuja sobre el arma para que se vea que la sujeta.
+// Con `fist` se dibuja cerrada, como en el boxeo.
+function drawPaw(hx, hy, ang, fist) {
+  // Con el puño (boxeo) la mano se hace más gorda cuanto más estirado está
+  // el brazo: el puño que sale a pegar se ve más grande.
+  const grow = fist ? 1 + 0.4 * clamp((Math.abs(hx) - 24) / 38, 0, 1) : 1;
+  const r = (fist ? 7.2 : 6.5) * grow;
+  ell(hx, hy, r, r, COL.skin, 2);
   if (modelId === 'tigresa') {
-    // Garritas: tres garras saliendo de la mano en la dirección del brazo.
     ctx.save();
-    ctx.translate(a.hx, a.hy);
-    ctx.rotate(Math.atan2(a.hy - sy, a.hx - sx));
-    for (const c of [-1, 0, 1]) {
+    ctx.translate(hx, hy);
+    ctx.rotate(ang);
+    ctx.scale(grow, grow);
+    if (fist) {
+      // Puño cerrado: dedos plegados y pulgar, sin garras afuera.
+      ctx.strokeStyle = COL.line;
+      ctx.lineWidth = 1.2;
+      ctx.lineCap = 'round';
+      for (const c of [-2.8, 0, 2.8]) {
+        ctx.beginPath();
+        ctx.arc(3.2, c, 2.3, -Math.PI / 2, Math.PI / 2);
+        ctx.stroke();
+      }
       ctx.beginPath();
-      ctx.moveTo(4, -1.8 + c * 3.1);
-      ctx.quadraticCurveTo(9.8, c * 3.5, 4, 1.8 + c * 3.1);
-      ctx.closePath();
-      fillStroke('#f7d9c4', 1.2, COL.line);
+      ctx.moveTo(-4.6, 3.2);
+      ctx.quadraticCurveTo(-1.5, 6.4, 2.6, 4.4);
+      ctx.stroke();
+    } else {
+      for (const c of [-1, 0, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(4, -1.8 + c * 3.1);
+        ctx.quadraticCurveTo(9.8, c * 3.5, 4, 1.8 + c * 3.1);
+        ctx.closePath();
+        fillStroke('#f7d9c4', 1.2, COL.line);
+      }
     }
     ctx.restore();
   }
@@ -2520,6 +2906,7 @@ function eyeMode() {
   if (state === 'fall') return 'surprise';
   if (state === 'sleep') return 'sleep';
   if (state === 'yawn' || state === 'sneeze') return 'sleep';
+  if (state === 'meditate') return 'sleep';
   if (state === 'happy' || state === 'cheer' || state === 'spin' || state === 'clap') return 'happy';
   return 'open';
 }
@@ -2725,9 +3112,10 @@ function drawMouth() {
 
 function drawHead(t, pz) {
   const hy = HEAD_Y + pz.headDY + Math.sin(t * 2) * 0.8;
-  headYCanvas = GROUND + pz.shift - pz.bob + hy;
+  if (state === 'sleep' && !drag) headYCanvas = GROUND + lieHead().y;
+  else headYCanvas = GROUND + pz.shift - pz.bob + hy;
   ctx.save();
-  ctx.translate(0, hy);
+  ctx.translate(pz.headDX || 0, hy);
   if (pz.tilt) ctx.rotate(pz.tilt);
 
   drawSideLock(false);
@@ -2923,7 +3311,341 @@ function drawProp(prop, t) {
     ell(2.4, -2.4, 2.6, 2.6, '#6ee7c7', 0);
     ell(7, 1.2, 2.6, 2.6, '#ffd76a', 0);
     ctx.restore();
+  } else if (prop === 'broom') {
+    ctx.save();
+    const sw = Math.sin(t * 2.4) * 0.1;
+    ctx.translate(8, -75);
+    ctx.rotate(sw);
+    ctx.translate(-8, 75);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#b9793c';
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.moveTo(36, -118);
+    ctx.lineTo(-44, -4);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-40, -8);
+    ctx.lineTo(-64, 7);
+    ctx.lineTo(-24, 9);
+    ctx.closePath();
+    ctx.fillStyle = '#e8c66a';
+    ctx.fill();
+    ctx.strokeStyle = '#a8843a';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.strokeStyle = '#c9a94f';
+    ctx.lineWidth = 1.6;
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.moveTo(-42, -5);
+      ctx.lineTo(-58 + i * 9, 8);
+      ctx.stroke();
+    }
+    for (let i = 0; i < 3; i++) {
+      const p = (t * 1.4 + i * 0.33) % 1;
+      ctx.globalAlpha = (1 - p) * 0.5;
+      ell(-48 + i * 8 - p * 7, 3 - p * 17, 4 + p * 4, 3 + p * 3, '#d8cbb0', 0);
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  } else if (prop === 'umbrella') {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(140,190,255,0.75)';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 16; i++) {
+      const sx = -92 + ((i * 41) % 224);
+      const p = (t * 1.9 + i * 0.17) % 1;
+      const y = -272 + p * 276;
+      ctx.beginPath();
+      ctx.moveTo(sx, y);
+      ctx.lineTo(sx - 4, y + 13);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = '#4a4180';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(34, -236);
+    ctx.lineTo(34, -98);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(28, -98, 6, 0, Math.PI);
+    ctx.stroke();
+    const cx = 34;
+    const rim = -236;
+    ctx.beginPath();
+    ctx.moveTo(cx - 66, rim);
+    ctx.quadraticCurveTo(cx, rim - 46, cx + 66, rim);
+    const seg = 132 / 5;
+    for (let i = 0; i < 5; i++) {
+      const x0 = cx + 66 - seg * i;
+      ctx.quadraticCurveTo(x0 - seg / 2, rim + 15, x0 - seg, rim);
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#ff8fbe';
+    ctx.fill();
+    ctx.strokeStyle = '#d8568c';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 1.8;
+    for (let i = 1; i < 5; i++) {
+      const x0 = cx - 66 + (132 * i) / 5;
+      ctx.beginPath();
+      ctx.moveTo(cx, rim - 42);
+      ctx.lineTo(x0, rim + 9);
+      ctx.stroke();
+    }
+    ell(cx, rim - 49, 4, 4, '#ffd76a', 1.6);
+    ctx.restore();
+  } else if (prop === 'balloon') {
+    ctx.save();
+    const bx = 46 + Math.sin(t * 1.1) * 7;
+    const by = -208 + Math.cos(t * 1.5) * 5;
+    ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(26, -106);
+    ctx.quadraticCurveTo((26 + bx) / 2 + Math.sin(t * 2) * 6, (-106 + by) / 2, bx, by + 26);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(bx, by + 25);
+    ctx.lineTo(bx - 5, by + 33);
+    ctx.lineTo(bx + 5, by + 33);
+    ctx.closePath();
+    ctx.fillStyle = '#e8447f';
+    ctx.fill();
+    ell(bx, by, 27, 31, '#ff6fae', 2.4);
+    ctx.beginPath();
+    ctx.ellipse(bx - 9, by - 11, 6, 9, -0.5, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.fill();
+    ctx.restore();
+  } else if (prop === 'guitar') {
+    ctx.save();
+    ctx.translate(6, -84);
+    ctx.rotate(0.5);
+    ctx.lineCap = 'round';
+    // Marco propio de la caja: origen en el nacimiento de la caña y eje +x
+    // hacia la boca grande, de modo que caña, boca y puente quedan alineados.
+    ctx.save();
+    ctx.translate(-24, -4);
+    ctx.rotate(0.107);
+    // Caña
+    ctx.strokeStyle = '#8a5a33';
+    ctx.lineWidth = 9;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-58, 0);
+    ctx.stroke();
+    // Clavijero con clavijas
+    rrect(-78, -11, 24, 22, 6, '#6e4526', 1.6);
+    for (const gy of [-13.6, 13.6]) {
+      for (const gx of [-72, -66, -60]) ell(gx, gy, 2.4, 2.4, '#c9a227', 1.2);
+    }
+    // Caja armónica: silueta de 8 en un solo trazo (sin arcos internos).
+    const S = { x: 20, y: 0, r: 23 };
+    const G = { x: 42, y: 0, r: 27 };
+    const ddx = G.x - S.x, ddy = G.y - S.y;
+    const dd = Math.hypot(ddx, ddy);
+    const aa = (G.r * G.r - S.r * S.r + dd * dd) / (2 * dd);
+    const hh = Math.sqrt(Math.max(0, S.r * S.r - aa * aa));
+    const mx = S.x + (ddx * aa) / dd, my = S.y + (ddy * aa) / dd;
+    const ppx = -ddy / dd, ppy = ddx / dd;
+    const I1 = [mx + hh * ppx, my + hh * ppy];
+    const I2 = [mx - hh * ppx, my - hh * ppy];
+    const angOf = (c, p) => Math.atan2(p[1] - c.y, p[0] - c.x);
+    const sweep = (c, from, to) => angOf(c, to) < angOf(c, from) ? angOf(c, to) + TAU : angOf(c, to);
+    ctx.beginPath();
+    ctx.ellipse(S.x, S.y, S.r, S.r, 0, angOf(S, I1), sweep(S, I1, I2));
+    ctx.ellipse(G.x, G.y, G.r, G.r, 0, angOf(G, I2), sweep(G, I2, I1));
+    ctx.closePath();
+    fillStroke('#e2a35c', 2.4);
+    // Boca y puente sobre el eje
+    ell(34, 0, 9.5, 9.5, '#4a2c17', 2);
+    rrect(47.5, -8, 7, 16, 2, '#6e4526', 1.4);
+    // Cuerdas: del puente al clavijero, por encima de la caja y la boca.
+    ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+    ctx.lineWidth = 1.2;
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath();
+      ctx.moveTo(51, i * 1.6);
+      ctx.lineTo(-54, i * 1.6);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.restore();
+  } else if (prop === 'fan') {
+    ctx.save();
+    ctx.translate(34 + Math.sin(t * 8) * 6, -108 + Math.cos(t * 8) * 5);
+    ctx.rotate(0.25 + Math.sin(t * 8) * 0.4);
+    const R = 54;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, R, -2.5, -0.5);
+    ctx.closePath();
+    ctx.fillStyle = '#ffd76a';
+    ctx.fill();
+    ctx.strokeStyle = '#c99a2e';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(150,90,20,0.5)';
+    ctx.lineWidth = 1.6;
+    for (let i = 0; i <= 6; i++) {
+      const th = -2.5 + (2 * i) / 6;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(th) * R, Math.sin(th) * R);
+      ctx.stroke();
+    }
+    ell(0, 0, 4.5, 4.5, '#8a5a33', 1.5);
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(160,220,255,0.75)';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 3; i++) {
+      const p = (t * 2.2 + i * 0.33) % 1;
+      const y = -142 + i * 26;
+      ctx.globalAlpha = (1 - p) * 0.85;
+      ctx.beginPath();
+      ctx.moveTo(62 + p * 44, y);
+      ctx.quadraticCurveTo(84 + p * 44, y - 9, 106 + p * 44, y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  } else if (prop === 'brush') {
+    ctx.save();
+    ctx.translate(46 + Math.sin(t * 6) * 4, -156 + Math.cos(t * 6) * 6);
+    ctx.rotate(-0.6 + Math.sin(t * 6) * 0.12);
+    rrect(-4, -4, 8, 32, 4, '#ff8fbe', 2);
+    ell(0, -16, 13, 17, '#ffd76a', 2.2);
+    ctx.strokeStyle = '#c99a2e';
+    ctx.lineWidth = 1.8;
+    ctx.lineCap = 'round';
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * 5, -30);
+      ctx.lineTo(i * 5, -39);
+      ctx.stroke();
+    }
+    ctx.restore();
+  } else if (prop === 'yoyo') {
+    ctx.save();
+    const L = 46 + 44 * (0.5 + 0.5 * Math.sin(t * 3.4));
+    const yx = 26 + Math.sin(t * 3.4) * 7;
+    const yy = -106 + L;
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(26, -106);
+    ctx.quadraticCurveTo((26 + yx) / 2 + 5, (-106 + yy) / 2, yx, yy - 10);
+    ctx.stroke();
+    ell(yx, yy, 11, 11, '#8d7be8', 2.2);
+    ell(yx, yy, 4, 4, '#ffd76a', 1.5);
+    ctx.restore();
+  } else if (prop === 'camera') {
+    ctx.save();
+    ctx.translate(54, -126);
+    ctx.rotate(-0.12);
+    rrect(-19, -13, 38, 26, 6, '#2f2b45', 2.2);
+    ell(0, 0, 10, 10, '#4a4470', 2);
+    ell(0, 0, 6, 6, '#1b1830', 1.5);
+    ell(-2, -2, 2, 2, 'rgba(255,255,255,0.6)', 0);
+    rrect(-16, -19, 12, 6, 2, '#4a4470', 1.4);
+    ell(12, -17, 3.5, 3.5, '#ff6fae', 1.4);
+    ctx.restore();
+    const f = (t * 0.7) % 1;
+    if (f < 0.12) {
+      const k = 1 - f / 0.12;
+      ctx.save();
+      ctx.globalAlpha = k;
+      ctx.fillStyle = '#fff7b0';
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const th = (i / 8) * Math.PI * 2 + t;
+        const r = i % 2 ? 11 : 27;
+        ctx.lineTo(64 + Math.cos(th) * r, -146 + Math.sin(th) * r);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
   }
+}
+
+// ---------- comba y aro de hula (efectos de escena) ----------
+
+// Ángulo de la comba: gira alrededor del eje que pasa por las manos.
+function ropeA() {
+  let a = (time * 9) % TAU;
+  if (a > Math.PI) a -= TAU;
+  return a;
+}
+
+// 0..1: altura del salto. Está en el aire mientras la comba le pasa por debajo.
+function ropeJump() {
+  const a = Math.abs(ropeA());
+  if (a >= Math.PI / 2) return 0;
+  const c = Math.cos(a);
+  return c * c;
+}
+
+function drawJumpRope(front) {
+  const w = modelId === 'webillo';
+  const hwL = w ? 150 : 50;
+  const hwR = w ? 120 : 50;
+  const handY = w ? -140 : -64;
+  const topY = w ? -310 : -300;
+  const bob = 34 * ropeJump();
+  const a = ropeA();
+  const R0 = -handY + 22;
+  const R1 = handY - topY;
+  const R = R0 + ((R1 - R0) * (1 - Math.cos(a))) / 2;
+  const ym = handY + R * Math.cos(a);
+  const cy = 2 * ym - handY;
+  if (!front) {
+    // Empuñaduras: siempre detrás de las zarpas para que parezca que las sujeta.
+    for (const [s, hw] of [[-1, hwL], [1, hwR]]) {
+      const ang = Math.atan2(handY - cy, hw * s);
+      ctx.save();
+      ctx.translate(hw * s, handY);
+      ctx.rotate(ang);
+      rrect(-9, -4.5, 34, 9, 4.5, '#e05a8a', 1.6, '#b03a68');
+      ctx.restore();
+    }
+  }
+  // Por delante durante toda la bajada: en la parte alta y en la de abajo la
+  // comba no cruza con el cuerpo, así que el cambio de capa no se nota.
+  const isFront = a < 0;
+  if (front !== isFront) return;
+  ctx.strokeStyle = '#f2b56b';
+  ctx.lineWidth = w ? 6 : 4.5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-hwL, handY);
+  ctx.quadraticCurveTo(0, cy, hwR, handY);
+  ctx.stroke();
+}
+
+function drawHoop(front) {
+  const w = modelId === 'webillo';
+  const cy = (w ? -66 : -74) + Math.sin(time * 5) * 4;
+  const rx = w ? 108 : 60;
+  const ry = (w ? 18 : 15) + Math.cos(time * 5) * 3;
+  ctx.save();
+  ctx.translate(0, cy);
+  ctx.rotate(Math.sin(time * 5) * 0.2);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rx, ry, 0, front ? 0 : Math.PI, front ? Math.PI : Math.PI * 2);
+  ctx.strokeStyle = '#ffb84d';
+  ctx.lineWidth = 8;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  ctx.strokeStyle = '#ffd76a';
+  ctx.lineWidth = 5;
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawBubble(dt) {
@@ -2938,16 +3660,18 @@ function drawBubble(dt) {
   const tw = ctx.measureText(bubble.t).width;
   const bw = Math.min(tw + 28, W - 20);
   const bh = 34;
-  const bx = clamp(W / 2 - bw / 2, 8, W - bw - 8);
+  // Tumbada: la burbuja se centra sobre la cabeza de lado, no sobre el cuerpo.
+  const bcx = state === 'sleep' && !drag ? W / 2 + lieHead().x : W / 2;
+  const bx = clamp(bcx - bw / 2, 8, W - bw - 8);
   const headTop = headYCanvas - 74;
   const by = clamp(headTop - bh - 12, 8, H - 60);
 
   rrect(bx, by, bw, bh, 13, 'rgba(255,255,255,0.95)', 2, 'rgba(90,74,150,0.35)');
 
   ctx.beginPath();
-  ctx.moveTo(W / 2 - 9, by + bh - 2);
-  ctx.lineTo(W / 2 + 7, by + bh - 2);
-  ctx.lineTo(W / 2 + 2, by + bh + 11);
+  ctx.moveTo(bcx - 9, by + bh - 2);
+  ctx.lineTo(bcx + 7, by + bh - 2);
+  ctx.lineTo(bcx + 2, by + bh + 11);
   ctx.closePath();
   ctx.fillStyle = 'rgba(255,255,255,0.95)';
   ctx.fill();
@@ -2987,8 +3711,10 @@ function drawScene(dt) {
   const a = Math.max(0, groundY() - pos.y);
   const pz = pose();
   irisDY = pz.irisDy || 0;
+  // Tumbada: solo mientras el sueño no se interrumpe (arrastre).
+  const lie = state === 'sleep' && !drag ? lieOf() : null;
 
-  drawShadow(a);
+  drawShadow(a, !!lie);
 
   ctx.save();
   ctx.translate(W / 2, GROUND);
@@ -3002,7 +3728,31 @@ function drawScene(dt) {
     ctx.scale(1 + squash * 0.16, 1 - squash * 0.12);
   }
   if (modelId !== 'webillo') ctx.scale(dir, 1);
-  ctx.translate(0, pz.shift - pz.bob);
+
+  // Cama y manta se dibujan en marco del suelo: el cuerpo entra y sale de su
+  // propio marco (tumbado rota 90°, en el resto solo baja por el desplazamiento).
+  const enter = () => {
+    if (lie) {
+      ctx.translate(lie.x, lie.y - pz.bob);
+      ctx.rotate(-Math.PI / 2);
+      if (lie.scale !== 1) ctx.scale(lie.scale, lie.scale);
+    } else {
+      ctx.translate(0, pz.shift - pz.bob);
+    }
+  };
+  const exit = () => {
+    if (lie) {
+      if (lie.scale !== 1) ctx.scale(1 / lie.scale, 1 / lie.scale);
+      ctx.rotate(Math.PI / 2);
+      ctx.translate(-lie.x, -(lie.y - pz.bob));
+    } else {
+      ctx.translate(0, -(pz.shift - pz.bob));
+    }
+  };
+
+  if (lie) drawBed();
+
+  enter();
   if (state === 'dance' && !drag && modelId !== 'webillo') ctx.rotate(Math.sin(phase) * 0.05);
   if (state === 'shiver' && !drag) {
     ctx.translate(Math.sin(time * 62) * 2.6, Math.sin(time * 47) * 1.3);
@@ -3019,37 +3769,76 @@ function drawScene(dt) {
     ctx.rotate(k * 1.3);
   }
 
-  const slp = state === 'sleep';
+  if (state === 'rope' && !drag) drawJumpRope(false);
+  if (state === 'hoop' && !drag) drawHoop(false);
+
   if (modelId === 'webillo') {
-    if (slp) {
-      ctx.translate(0, -(pz.shift - pz.bob));
-      drawBed();
-      ctx.translate(0, pz.shift - pz.bob);
-    }
     drawWebillo(time, pz);
   } else {
-    drawTail(time);
-    drawBackHair();
-    if (slp) {
-      // La cama va en marco del suelo (sin el desplazamiento del sueño).
-      ctx.translate(0, -(pz.shift - pz.bob));
-      drawBed();
-      ctx.translate(0, pz.shift - pz.bob);
-    }
-    if (modelId === 'tigresa') drawKatana();
+      drawTail(time);
+      drawBackHair();
+      if (modelId === 'tigresa' && !lie) {
+        if (state === 'katana') {
+          // La funda se queda en la espalda; la hoja sale por su eje.
+          const k = katAnim();
+          if (!k.front) {
+            withBlade(k.fx, k.fy, k.ang, () => drawKatanaBlade(1));
+            drawKatanaSaya();
+            withBlade(k.fx, k.fy, k.ang, drawKatanaTsuka);
+          } else {
+            drawKatanaSaya();
+          }
+        } else {
+          drawKatana();
+        }
+      }
     drawLegs(time, pz.legs);
     if (modelId === 'tigresa') drawTigresaBody(time);
     else drawDress(time);
     drawShoulders();
     drawNeck();
     drawHead(time, pz);
-    for (const ar of armConfig(pz, time)) drawArm(ar);
+      if (!lie) for (const ar of armConfig(pz, time)) drawArm(ar);
+      if (state === 'rope' && !drag) {
+        // La comba, cuando viene por delante, pasa por encima de la cabeza y
+        // de los brazos; después se redibujan las zarpas para que parezca que
+        // sujeta las empuñaduras.
+        drawJumpRope(true);
+        if (!lie) for (const ar of armConfig(pz, time)) {
+          drawPaw(ar.hx, ar.hy, Math.atan2(ar.hy + 112, ar.hx - 15.5 * ar.sign));
+        }
+      }
+      if (modelId === 'tigresa' && state === 'katana') {
+        const k = katAnim();
+        if (k.front) {
+          withBlade(k.fx, k.fy, k.ang, drawKatanaBlade);
+          withBlade(k.fx, k.fy, k.ang, drawKatanaTsuka);
+          drawPaw(k.hL[0], k.hL[1], Math.atan2(k.hL[1] + 112, k.hL[0] + 15.5));
+          drawPaw(k.hR[0], k.hR[1], Math.atan2(k.hR[1] + 112, k.hR[0] - 15.5));
+        }
+      }
     if (state === 'peek' && !drag) drawPeekHands(time, pz);
     if (pz.prop && !drag) drawProp(pz.prop, time);
+    // Zarpas por encima del objeto para que se vea que lo sujeta.
+    if (!drag && (pz.prop === 'broom' || pz.prop === 'guitar')) {
+      for (const ar of armConfig(pz, time)) {
+        drawPaw(ar.hx, ar.hy, Math.atan2(ar.hy + 112, ar.hx - 15.5 * ar.sign));
+      }
+    }
   }
-  if (slp) {
-    ctx.translate(0, -(pz.shift - pz.bob));
-    if (!drag) drawBlanket();
+
+  if (state === 'rope' && !drag && modelId === 'webillo') drawJumpRope(true);
+  if (state === 'hoop' && !drag) drawHoop(true);
+
+  if (lie) {
+    exit();
+    drawBlanket();
+    enter();
+    if (modelId !== 'webillo') {
+      // Brazo cercano por encima de la manta, como echado sobre las sábanas.
+      for (const ar of armConfig(pz, time)) if (ar.sign > 0) drawArm(ar);
+    }
+    exit();
   }
 
   ctx.restore();
@@ -3535,6 +4324,44 @@ function drawWebilloArms(pz, t) {
       L = { s: Ls, e: { x: -110, y: -176 }, h: { x: -54, y: -196 } };
       R = { s: Rs, e: { x: 76, y: -176 }, h: { x: 22, y: -196 } };
       break;
+    case 'rope':
+      L = { s: Ls, e: { x: -158, y: -144 }, h: { x: -150, y: -140 } };
+      R = { s: Rs, e: { x: 114, y: -146 }, h: { x: 120, y: -140 } };
+      break;
+    case 'broom':
+      L = { s: Ls, e: { x: -72, y: -140 }, h: { x: -4, y: -111 } };
+      R = { s: Rs, e: { x: 74, y: -168 }, h: { x: 20, y: -147 } };
+      break;
+    case 'umb':
+      L = { s: Ls, e: { x: -142, y: -118 + breathe }, h: { x: -140, y: -84 + breathe } };
+      R = { s: Rs, e: { x: 74, y: -156 }, h: { x: 22, y: -146 } };
+      break;
+    case 'guitar':
+      L = { s: Ls, e: { x: -104, y: -150 }, h: { x: -48, y: -151 } };
+      R = { s: Rs, e: { x: 58, y: -146 }, h: { x: 2 + Math.sin(t * 7) * 3, y: -122 + Math.abs(Math.sin(t * 7)) * 5 } };
+      break;
+    case 'fan':
+      L = { s: Ls, e: { x: -142, y: -118 + breathe }, h: { x: -140, y: -84 + breathe } };
+      R = { s: Rs, e: { x: 76, y: -156 }, h: { x: 22 + Math.sin(t * 8) * 6, y: -144 + Math.cos(t * 8) * 5 } };
+      break;
+    case 'brush':
+      L = { s: Ls, e: { x: -142, y: -118 + breathe }, h: { x: -140, y: -84 + breathe } };
+      R = { s: Rs, e: { x: 96, y: -190 }, h: { x: 34 + Math.sin(t * 6) * 4, y: -192 + Math.cos(t * 6) * 6 } };
+      break;
+    case 'camera':
+      L = { s: Ls, e: { x: -142, y: -118 + breathe }, h: { x: -140, y: -84 + breathe } };
+      R = { s: Rs, e: { x: 84, y: -176 }, h: { x: 42, y: -162 } };
+      break;
+    case 'box': {
+      const p = Math.sin(t * 8);
+      L = { s: Ls, e: p > 0 ? { x: -80, y: -146 } : { x: -170, y: -150 }, h: p > 0 ? { x: -6, y: -148 } : { x: -206, y: -152 } };
+      R = { s: Rs, e: p > 0 ? { x: 148, y: -152 } : { x: 64, y: -146 }, h: p > 0 ? { x: 190, y: -154 } : { x: 6, y: -148 } };
+      break;
+    }
+    case 'zen':
+      L = { s: Ls, e: { x: -128, y: -130 }, h: { x: -140, y: -120 } };
+      R = { s: Rs, e: { x: 112, y: -132 }, h: { x: 122, y: -122 } };
+      break;
     default:
       L = { s: Ls, e: { x: -142, y: -118 + breathe }, h: { x: -140, y: -82 + breathe } };
       R = { s: Rs, e: { x: 116, y: -120 - breathe }, h: { x: 114, y: -84 - breathe } };
@@ -3748,7 +4575,9 @@ function drawWebilloProp(prop, t) {
 
 function drawWebillo(t, pz) {
   if (!wLay || !wLay.body) return;
-  headYCanvas = GROUND + pz.shift - pz.bob - 192;
+  headYCanvas = (state === 'sleep' && !drag)
+    ? GROUND + lieHead().y
+    : GROUND + pz.shift - pz.bob - 192;
   const put = (name) => ctx.drawImage(wLay[name], -W / 2, -GROUND);
 
   put('cape');
