@@ -34,8 +34,8 @@ const MODEL_COL = {
     dressSh: '#14100e',
     trim: '#f07a2a',
     inner: '#f7d9c4',
-    eye: '#ffc53d',
-    eyeSh: '#c97a12',
+    eye: '#b8e06a',
+    eyeSh: '#7fae3f',
     sock: '#221a17',
     shoe: '#141110',
     line: '#5a1a0e',
@@ -747,6 +747,10 @@ function chooseNext() {
   }
   if (state === 'sleep' && chosen === 'sleep') chosen = 'walk';
   setStateSay(chosen);
+  // Maullidos autónomos: también maúlla sola al cambiar de actividad.
+  if (chosen !== 'fall' && Math.random() < 0.45) {
+    meow(ACT_SND[chosen] || pick(FREE_SND));
+  }
 }
 
 function pet() {
@@ -808,13 +812,29 @@ function getAudio() {
 
 // Variantes de maullido: [frecuencia inicial, pico, final, duración, volumen]
 const MEOWS = {
-  short: [760, 1280, 880, 0.28, 0.12],
-  low: [420, 620, 330, 0.6, 0.13],
-  big: [600, 1350, 700, 0.7, 0.15],
-  chirp: [1150, 1750, 1300, 0.16, 0.1],
-  trip: [1050, 1500, 420, 0.4, 0.15],
-  meow: [640, 1150, 520, 0.5, 0.14]
+  short: [820, 1300, 860, 0.3, 0.12],
+  low: [380, 560, 300, 0.65, 0.14],
+  big: [560, 1400, 640, 0.75, 0.16],
+  chirp: [1200, 1800, 1400, 0.18, 0.1],
+  trip: [1100, 1550, 400, 0.45, 0.15],
+  meow: [560, 1080, 470, 0.55, 0.15],
+  mew: [1000, 1600, 1150, 0.22, 0.1],
+  yowl: [470, 950, 330, 0.95, 0.17]
 };
+
+// Variantes sueltas para los maullidos autónomos sin acción asociada.
+const FREE_SND = ['meow', 'short', 'mew', 'low', 'chirp', 'yowl'];
+
+// Ruido compartido para el aire del maullido.
+let noiseB = null;
+function noiseBuf(a) {
+  if (!noiseB) {
+    noiseB = a.createBuffer(1, Math.floor(a.sampleRate * 0.5), a.sampleRate);
+    const d = noiseB.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  return noiseB;
+}
 
 // Sonido felín asociado a cada acción del menú.
 const ACT_SND = {
@@ -864,31 +884,85 @@ function meow(kind) {
   }
   const P = MEOWS[kind] || MEOWS.meow;
   const f0 = P[0], f1 = P[1], f2 = P[2], dur = P[3], vol = P[4];
+  const t2 = t + dur;
+
+  // Voz: contorno felino (arranca bajo, sube al pico y cae con colita).
   const o = a.createOscillator();
-  const g = a.createGain();
-  const f = a.createBiquadFilter();
   o.type = 'sawtooth';
-  o.frequency.setValueAtTime(f0, t);
-  o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.18);
-  o.frequency.exponentialRampToValueAtTime(f2, t + dur * 0.84);
-  f.type = 'lowpass';
-  f.frequency.value = 2100;
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(vol, t + dur * 0.1);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  const of = o.frequency;
+  of.setValueAtTime(f0 * 0.8, t);
+  of.exponentialRampToValueAtTime(f1, t + dur * 0.3);
+  of.exponentialRampToValueAtTime(f2, t + dur * 0.85);
+  of.exponentialRampToValueAtTime(f2 * 0.75, t2);
+
+  // Vibrato felino suave que entra cuando ya suena.
   const lfo = a.createOscillator();
+  lfo.frequency.value = 6.5;
   const lg = a.createGain();
-  lfo.frequency.value = kind === 'low' ? 24 : 15;
-  lg.gain.value = kind === 'low' ? 40 : 28;
+  lg.gain.setValueAtTime(0, t);
+  lg.gain.linearRampToValueAtTime(f1 * 0.02, t + dur * 0.4);
   lfo.connect(lg);
-  lg.connect(o.frequency);
-  lfo.start(t);
-  lfo.stop(t + dur + 0.02);
-  o.connect(f);
-  f.connect(g);
+  lg.connect(of);
+
+  // Temblor fino: hace que no suene a sintetizador recto.
+  const jit = a.createOscillator();
+  jit.frequency.value = 11;
+  const jg = a.createGain();
+  jg.gain.value = f1 * 0.008;
+  jit.connect(jg);
+  jg.connect(of);
+
+  // "M-ya-ow": el corte bajo al inicio (m), se abre y vuelve a cerrarse.
+  const lp = a.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.Q.value = 3.5;
+  lp.frequency.setValueAtTime(400, t);
+  lp.frequency.exponentialRampToValueAtTime(2700, t + dur * 0.26);
+  lp.frequency.exponentialRampToValueAtTime(850, t2);
+
+  // Pico nasal: el formante que da el timbre de gato.
+  const nas = a.createBiquadFilter();
+  nas.type = 'peaking';
+  nas.frequency.value = 1350;
+  nas.Q.value = 2;
+  nas.gain.value = 9;
+
+  // Aire del maullido: ruido filtrado por debajo de la voz.
+  const nsrc = a.createBufferSource();
+  nsrc.buffer = noiseBuf(a);
+  nsrc.loop = true;
+  const nf = a.createBiquadFilter();
+  nf.type = 'bandpass';
+  nf.frequency.value = 2300;
+  nf.Q.value = 0.7;
+  const ng = a.createGain();
+  ng.gain.setValueAtTime(0.0001, t);
+  ng.gain.exponentialRampToValueAtTime(vol * 0.5, t + dur * 0.1);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t + dur * 0.8);
+
+  // Envolvente: ataque rápido, desfallece un poco y remata.
+  const g = a.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + dur * 0.09);
+  g.gain.exponentialRampToValueAtTime(vol * 0.6, t + dur * 0.42);
+  g.gain.exponentialRampToValueAtTime(vol * 0.95, t + dur * 0.65);
+  g.gain.exponentialRampToValueAtTime(0.0001, t2);
+
+  o.connect(lp);
+  nsrc.connect(nf);
+  nf.connect(ng);
+  ng.connect(lp);
+  lp.connect(nas);
+  nas.connect(g);
   g.connect(a.destination);
+  lfo.start(t);
+  lfo.stop(t2 + 0.05);
+  jit.start(t);
+  jit.stop(t2 + 0.05);
+  nsrc.start(t);
+  nsrc.stop(t2);
   o.start(t);
-  o.stop(t + dur + 0.02);
+  o.stop(t2 + 0.05);
 }
 
 // Golpe seco al caer/tocar el suelo.
@@ -3363,24 +3437,29 @@ function drawProp(prop, t) {
       ctx.lineTo(sx - 4, y + 13);
       ctx.stroke();
     }
+    const cx = 34;
+    const rim = -236;
+    // En una curva cuadrática el punto de control queda al doble de lo que
+    // sube la curva: sin multiplicar, la cupula sale aplastada.
+    const H = 42;
+    const DIP = 10;
+    const top = rim - H;
+    const seg = 132 / 5;
     ctx.strokeStyle = '#4a4180';
     ctx.lineWidth = 5;
     ctx.beginPath();
-    ctx.moveTo(34, -236);
-    ctx.lineTo(34, -98);
+    ctx.moveTo(cx, rim);
+    ctx.lineTo(cx, -98);
     ctx.stroke();
     ctx.beginPath();
-    ctx.arc(28, -98, 6, 0, Math.PI);
+    ctx.arc(cx - 6, -98, 6, 0, Math.PI);
     ctx.stroke();
-    const cx = 34;
-    const rim = -236;
     ctx.beginPath();
     ctx.moveTo(cx - 66, rim);
-    ctx.quadraticCurveTo(cx, rim - 46, cx + 66, rim);
-    const seg = 132 / 5;
+    ctx.quadraticCurveTo(cx, rim - H * 2, cx + 66, rim);
     for (let i = 0; i < 5; i++) {
       const x0 = cx + 66 - seg * i;
-      ctx.quadraticCurveTo(x0 - seg / 2, rim + 15, x0 - seg, rim);
+      ctx.quadraticCurveTo(x0 - seg / 2, rim + DIP * 2, x0 - seg, rim);
     }
     ctx.closePath();
     ctx.fillStyle = '#ff8fbe';
@@ -3391,13 +3470,13 @@ function drawProp(prop, t) {
     ctx.strokeStyle = 'rgba(255,255,255,0.5)';
     ctx.lineWidth = 1.8;
     for (let i = 1; i < 5; i++) {
-      const x0 = cx - 66 + (132 * i) / 5;
+      const x0 = cx - 66 + seg * i;
       ctx.beginPath();
-      ctx.moveTo(cx, rim - 42);
-      ctx.lineTo(x0, rim + 9);
+      ctx.moveTo(cx, top);
+      ctx.lineTo(x0, rim);
       ctx.stroke();
     }
-    ell(cx, rim - 49, 4, 4, '#ffd76a', 1.6);
+    ell(cx, top - 5, 4.5, 4.5, '#ffd76a', 1.6);
     ctx.restore();
   } else if (prop === 'balloon') {
     ctx.save();
@@ -3820,7 +3899,7 @@ function drawScene(dt) {
     if (state === 'peek' && !drag) drawPeekHands(time, pz);
     if (pz.prop && !drag) drawProp(pz.prop, time);
     // Zarpas por encima del objeto para que se vea que lo sujeta.
-    if (!drag && (pz.prop === 'broom' || pz.prop === 'guitar')) {
+    if (!drag && (pz.prop === 'broom' || pz.prop === 'guitar' || pz.prop === 'umbrella')) {
       for (const ar of armConfig(pz, time)) {
         drawPaw(ar.hx, ar.hy, Math.atan2(ar.hy + 112, ar.hx - 15.5 * ar.sign));
       }
@@ -4614,7 +4693,16 @@ function drawWebillo(t, pz) {
 async function init() {
   try {
     const i = await api.info();
-    displays = i.displays || [];
+    const list = i.displays || [];
+    // Un evento de pantallas puede llegar antes que esta respuesta; si traía
+    // ya las diagonales EDID no hay que perderlas al pisar la lista.
+    displays = list.map((d) => {
+      if (d.diag === undefined) {
+        const prev = displays.find((o) => o.id === d.id);
+        if (prev && prev.diag > 0) return Object.assign({}, d, { diag: prev.diag });
+      }
+      return d;
+    });
     logDisplays('info', displays);
     pos = { x: i.win.x, y: i.win.y };
     sent = { x: Math.round(pos.x), y: Math.round(pos.y) };
@@ -4622,6 +4710,13 @@ async function init() {
     if (api.sizeMul) api.sizeMul(sizeId);
     syncGeometry();
     refreshWA();
+    // Colocar ya los pies en el suelo antes del primer frame: si no, el primer
+    // setBounds sale con la ventana baja (alto de 190) y luego pega un salto.
+    if (displays.length) {
+      calcLayout();
+      if (!air) pos.y = groundY();
+      commitLayout();
+    }
     ready = true;
     dir = 1;
     setState('walk');
@@ -4637,7 +4732,10 @@ api.onAction(doAction);
 api.onDisplays((d) => {
   displays = d;
   logDisplays('changed', displays);
-  syncGeometry();
+  // Antes de init() pos todavía es 0,0 y la ventana no tiene su geometría
+  // buena: recalcular ahí dejaba la ventana a pantalla completa y la mascota
+  // fuera de sitio. Los eventos previos solo actualizan la lista.
+  if (ready) syncGeometry();
 });
 
 let last = performance.now();

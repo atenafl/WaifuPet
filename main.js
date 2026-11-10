@@ -3,10 +3,19 @@ const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
 
+// Al arrancar con la tarea, Windows reenumera pantallas y Chromium decide
+// (mal) que la ventana está "oculta": deja de dibujarla aunque esté arriba del
+// todo y con contenido -> la mascota invisible. Sin cálculo de oclusión nativa
+// sigue presentando frames siempre.
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+
 const W = 240;
 const H = 190;
 
 let win = null;
+let alwaysTop = true;
 let paused = false;
 let sound = true;
 let model = 'tigresa';
@@ -48,22 +57,78 @@ function displayLabel(d, i) {
 }
 
 // Monitor activos con su posición física (px) y diagonal (cm) vía EDID.
+// En el .exe empaquetado el script vive en resources/ (extraResources), porque
+// no se puede ejecutar un fichero metido dentro del asar.
 let monList = null;
 let sizesPromise = null;
+let sizesTries = 0;
+let sizesTimer = null;
+
+function monSizesPath() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'mon-sizes.ps1')
+    : path.join(__dirname, 'mon-sizes.ps1');
+}
+
+// Al arrancar con la sesión, PowerShell/WMI todavía no están listos y el
+// script de diagonales falla. Antes se rendía tras dos intentos y la mascota
+// se quedaba sin diagonales: mismo tamaño en todos los monitores (no
+// reescalaba). Guardamos la última lectura buena para arrancar ya con ella y
+// reintentamos con espera creciente hasta que el sistema despierte.
+function monSizesCachePath() {
+  return path.join(app.getPath('userData'), 'mon-sizes.json');
+}
+
+function loadSizesCache() {
+  try {
+    const list = JSON.parse(fs.readFileSync(monSizesCachePath(), 'utf8'));
+    if (Array.isArray(list)) {
+      const ok = list.filter((m) => m && isFinite(m.x) && isFinite(m.y) && m.diag > 0);
+      if (ok.length) return ok;
+    }
+  } catch (e) { /* sin caché todavía */ }
+  return null;
+}
+
+function saveSizesCache(list) {
+  try {
+    fs.mkdirSync(path.dirname(monSizesCachePath()), { recursive: true });
+    fs.writeFileSync(monSizesCachePath(), JSON.stringify(list));
+  } catch (e) { /* ignorar */ }
+}
 
 function monitorSizes() {
   if (sizesPromise) return sizesPromise;
   sizesPromise = new Promise((resolve) => {
     execFile('powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'mon-sizes.ps1')],
-      { timeout: 5000, windowsHide: true }, (err, stdout) => {
-        if (err) return resolve(null);
+      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', monSizesPath()],
+      { timeout: 15000, windowsHide: true }, (err, stdout) => {
+        sizesPromise = null;
         const list = [];
-        for (const line of String(stdout).split(/\r?\n/)) {
-          const m = line.trim().match(/^(-?\d+)\s*,\s*(-?\d+)\s*,\s*(\d+(?:\.\d+)?)$/);
-          if (m) list.push({ x: +m[1], y: +m[2], diag: parseFloat(m[3]) });
+        if (!err) {
+          for (const line of String(stdout).split(/\r?\n/)) {
+            const m = line.trim().match(/^(-?\d+)\s*,\s*(-?\d+)\s*,\s*(\d+(?:\.\d+)?)$/);
+            if (m) list.push({ x: +m[1], y: +m[2], diag: parseFloat(m[3]) });
+          }
         }
-        resolve(list.length ? list : null);
+        if (list.length) {
+          sizesTries = 0;
+          monList = list;
+          saveSizesCache(list);
+          notifyDisplays();
+          resolve(list);
+          return;
+        }
+        sizesTries++;
+        logdbg('mon-sizes intento ' + sizesTries + ': ' + (err ? (err.message || err) : 'sin datos'));
+        if (sizesTries <= 10 && !sizesTimer) {
+          const delay = Math.min(30000, 2000 * Math.pow(1.7, sizesTries - 1));
+          sizesTimer = setTimeout(() => {
+            sizesTimer = null;
+            monitorSizes();
+          }, delay);
+        }
+        resolve(monList);
       });
   });
   return sizesPromise;
@@ -260,11 +325,11 @@ function showMenu() {
     {
       label: 'Siempre visible',
       type: 'checkbox',
-      checked: true,
+      checked: alwaysTop,
       click: (item) => {
-        const on = !item.checked;
-        item.checked = on;
-        if (win && !win.isDestroyed()) win.setAlwaysOnTop(on, 'screen-saver');
+        alwaysTop = !alwaysTop;
+        item.checked = alwaysTop;
+        if (win && !win.isDestroyed()) win.setAlwaysOnTop(alwaysTop, 'screen-saver');
       }
     },
     { type: 'separator' },
@@ -305,11 +370,11 @@ ipcMain.on('pet-log', (_e, s) => {
 });
 
 ipcMain.handle('pet-info', async () => {
-  const s = await Promise.race([
-    monitorSizes(),
-    new Promise((r) => setTimeout(() => r(null), 2500))
-  ]);
-  if (s && !monList) monList = s;
+  // No bloquear el primer pintado esperando a PowerShell/EDID: al arrancar con
+  // la sesión puede tardar segundos y la mascota se quedaba con geometría
+  // provisional (ventana a pantalla completa / fuera de sitio). Se responde ya
+  // con las pantallas (monitorSizes ya va lanzado desde whenReady y avisará
+  // cuando tenga las diagonales).
   return { win: win.getBounds(), displays: displayList() };
 });
 
@@ -343,16 +408,21 @@ ipcMain.on('pet-dragstate', (_e, on) => {
 });
 
 app.whenReady().then(() => {
+  // Antes de crear la ventana: si hay diagonales guardadas de la última vez,
+  // el primer layout ya sale con el tamaño correcto aunque PowerShell falle.
+  monList = loadSizesCache();
   createWindow();
   screen.on('display-added', notifyDisplays);
   screen.on('display-removed', notifyDisplays);
   screen.on('display-metrics-changed', notifyDisplays);
-  monitorSizes().then((s) => {
-    if (s && !monList) {
-      monList = s;
-      notifyDisplays();
-    }
-  });
+  // Recoloca en la banda "topmost" por si algo (arranque de sesión, cambio de
+  // pantallas, otras apps) nos baja de la pila Z.
+  setInterval(() => {
+    if (win && !win.isDestroyed() && alwaysTop) win.setAlwaysOnTop(true, 'screen-saver');
+  }, 5000);
+  // Refresca diagonales en segundo plano (y reintenta si el sistema aún no
+  // responde). monitorSizes() avisa al renderer cuando consigue datos.
+  monitorSizes();
 });
 
 app.on('window-all-closed', () => app.quit());

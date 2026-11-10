@@ -23,6 +23,12 @@
       "assets/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "mon-sizes.ps1",
+        "to": "mon-sizes.ps1"
+      }
+    ],
     "win": {
       "target": "portable",
       "icon": "build/icon.png"
