@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="color-scheme" content="dark">
+  <title>Tigresa</title>
+  <link rel="stylesheet" href="chat.css">
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="titlebar">
+      <div class="brand">
+        <div class="avatar" aria-hidden="true">
+          <span class="ear l"></span><span class="ear r"></span>
+          <span class="face">•ᴗ•</span>
+        </div>
+        <div class="who">
+          <div class="name" id="petName">Tigresa</div>
+          <div class="state"><span class="dot" id="statusDot"></span><span id="statusText">En línea</span></div>
+        </div>
+      </div>
+      <div class="winbtns">
+        <button class="icon" id="btnSettings" title="Ajustes">⚙</button>
+        <button class="icon" id="btnMin" title="Minimizar">—</button>
+        <button class="icon danger" id="btnClose" title="Cerrar">×</button>
+      </div>
+    </header>
+
+    <main class="messages" id="messages">
+      <div class="empty" id="empty">
+        <div class="hello">¡Hola! Soy tu tigresa.</div>
+        <div class="sub">Pídeme que me mueva, que abra algo o que te ayude con el PC.</div>
+        <div class="chips">
+          <button class="chip" data-say="Ven a la derecha de la pantalla">Ven aquí</button>
+          <button class="chip" data-say="Abre la calculadora">Abre la calculadora</button>
+          <button class="chip" data-say="Pon un temporizador de 5 minutos para estirarme">Temporizador 5 min</button>
+          <button class="chip" data-say="¿Qué ves en mi pantalla?">Mira mi pantalla</button>
+          <button class="chip" data-say="Guarda una nota: comprar café">Guarda una nota</button>
+          <button class="chip" data-say="¿Qué puedes hacer?">¿Qué sabes hacer?</button>
+        </div>
+      </div>
+    </main>
+
+    <div class="confirm" id="confirm" hidden>
+      <div class="confirm-card">
+        <div class="confirm-risk" id="confirmRisk">Permiso</div>
+        <div class="confirm-title" id="confirmTitle"></div>
+        <div class="confirm-detail" id="confirmDetail"></div>
+        <label class="check" id="confirmAlwaysWrap">
+          <input type="checkbox" id="confirmAlways">
+          <span>No volver a preguntar en esta conversación</span>
+        </label>
+        <div class="confirm-actions">
+          <button class="btn ghost" id="btnDeny">Ahora no</button>
+          <button class="btn primary" id="btnAllow">Permitir</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="settings" id="settings" hidden>
+      <div class="settings-head">
+        <div>
+          <div class="settings-title">Ajustes</div>
+          <div class="settings-sub">Todo se queda en tu PC</div>
+        </div>
+        <button class="icon" id="btnSettingsClose" title="Cerrar">×</button>
+      </div>
+      <div class="settings-body">
+        <label class="field">
+          <span>Proveedor</span>
+          <select id="provider">
+            <option value="gemini">Google Gemini</option>
+            <option value="openai">OpenAI compatible</option>
+            <option value="ollama">Ollama (local)</option>
+          </select>
+        </label>
+        <label class="field" id="keyField">
+          <span>Clave de API</span>
+          <input type="password" id="apiKey" placeholder="Pega tu clave aquí" autocomplete="off">
+          <small id="keyHint">Se guarda cifrada con el sistema.</small>
+        </label>
+        <label class="field">
+          <span>Modelo</span>
+          <input type="text" id="model" placeholder="gemini-2.5-flash" autocomplete="off">
+        </label>
+        <label class="field" id="baseField">
+          <span>URL base (OpenAI compatible)</span>
+          <input type="text" id="baseUrl" placeholder="https://api.openai.com/v1" autocomplete="off">
+        </label>
+        <label class="field" id="ollamaField">
+          <span>URL de Ollama</span>
+          <input type="text" id="ollamaUrl" placeholder="http://localhost:11434/v1" autocomplete="off">
+        </label>
+        <label class="field">
+          <span>Tu nombre (opcional)</span>
+          <input type="text" id="userName" placeholder="Alfonso" autocomplete="off">
+        </label>
+
+        <div class="group">
+          <div class="group-title">Permisos</div>
+          <label class="check">
+            <input type="checkbox" id="allowComputer">
+            <span>Puede mirar la pantalla y controlar ratón y teclado (siempre te pide permiso)</span>
+          </label>
+          <label class="check">
+            <input type="checkbox" id="voice">
+            <span>Hablar en voz alta las respuestas</span>
+          </label>
+          <label class="check">
+            <input type="checkbox" id="shortcuts">
+            <span>Atajos globales (Ctrl+Alt+Espacio para abrirme)</span>
+          </label>
+          <label class="check">
+            <input type="checkbox" id="hideFullscreen">
+            <span>Ocultarme cuando haya un juego o vídeo a pantalla completa</span>
+          </label>
+        </div>
+
+        <div class="group">
+          <div class="group-title">Descanso</div>
+          <label class="field inline">
+            <span>Dormir tras</span>
+            <input type="number" id="idleMinutes" min="2" max="180" step="1">
+            <span>min sin actividad</span>
+          </label>
+        </div>
+
+        <div class="settings-actions">
+          <button class="btn ghost" id="btnTest">Probar conexión</button>
+          <button class="btn primary" id="btnSave">Guardar</button>
+        </div>
+        <div class="test-result" id="testResult"></div>
+        <div class="settings-foot">
+          <button class="link" id="btnClear">Borrar conversación</button>
+          <span>·</span>
+          <span>v1.1 · WaifuPet IA</span>
+        </div>
+      </div>
+    </section>
+
+    <footer class="composer">
+      <button class="icon mic" id="btnMic" title="Hablar (Ctrl+Alt+T)">🎙</button>
+      <textarea id="input" rows="1" placeholder="Escríbeme o pídeme algo…" maxlength="2000"></textarea>
+      <button class="icon send" id="btnSend" title="Enviar">➤</button>
+      <button class="icon stop" id="btnStop" title="Parar" hidden>■</button>
+    </footer>
+    <div class="hint" id="hint">Enter envía · Shift+Enter salto de línea · Esc para parar</div>
+  </div>
+  <script src="chat.js"></script>
+</body>
+</html>

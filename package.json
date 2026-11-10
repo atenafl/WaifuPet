@@ -1,7 +1,7 @@
 {
   "name": "waifu-pet",
-  "version": "1.0.0",
-  "description": "Mascota de escritorio: waifu con orejas y cola de gato",
+  "version": "1.1.0",
+  "description": "Mascota de escritorio con IA: waifu tigresa que habla, se mueve y te ayuda con el PC",
   "main": "main.js",
   "author": "atenafl",
   "scripts": {
@@ -20,6 +20,11 @@
       "main.js",
       "pet.js",
       "preload.js",
+      "chat.html",
+      "chat.css",
+      "chat.js",
+      "preload-chat.js",
+      "ai/**/*",
       "assets/**/*",
       "package.json"
     ],
@@ -27,6 +32,14 @@
       {
         "from": "mon-sizes.ps1",
         "to": "mon-sizes.ps1"
+      },
+      {
+        "from": "input.ps1",
+        "to": "input.ps1"
+      },
+      {
+        "from": "wins.ps1",
+        "to": "wins.ps1"
       }
     ],
     "win": {

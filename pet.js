@@ -161,6 +161,8 @@ let convNow = null;
 let lastCursor = { x: 0, y: 0 };
 let winDipW = W;
 let winDipH = H;
+let globalCursor = null;
+let aiTargetX = null;
 const F = () => (winDipW || W) / W;
 const Fh = () => (winDipH || H) / H;
 let lastClick = 0;
@@ -768,6 +770,49 @@ function jump() {
   meow('short');
 }
 
+// ---------- movimiento pedido por la IA ----------
+
+function aiTeleport(x) {
+  if (!ready) return;
+  if (typeof x !== 'number' || !isFinite(x)) {
+    const d = pickDisplay();
+    const b = d ? d.workArea : wa;
+    if (!b) return;
+    let nx = pos.x;
+    for (let i = 0; i < 10 && Math.abs(nx - pos.x) < 180; i++) {
+      nx = rand(b.x, Math.max(b.x, b.x + b.width - winDipW));
+    }
+    x = nx;
+  }
+  aiTargetX = null;
+  spawnSparkles(20);
+  spawnRing();
+  spawnSparkles(8);
+  pos.x = clampX(x);
+  pos.y = groundY();
+  vy = 0;
+  air = false;
+  refreshWA();
+  applyMove();
+  setState('happy');
+  meow('short');
+}
+
+function aiGoTo(x, teleport) {
+  if (!ready) return;
+  const target = clampX(Number(x));
+  if (!isFinite(target)) return;
+  if (teleport) {
+    aiTeleport(target);
+    return;
+  }
+  if (Math.abs(target - pos.x) < 14) return;
+  aiTargetX = target;
+  dir = target > pos.x ? 1 : -1;
+  if (state !== 'walk') setState('walk');
+  dur = 1e9;
+}
+
 function doAction(a) {
   switch (a) {
     case 'pet': pet(); break;
@@ -1050,6 +1095,7 @@ window.addEventListener('mouseleave', () => {
 
 function finishDrag(cx, cy) {
   drag = null;
+  aiTargetX = null;
   api.dragState(false);
   document.body.style.cursor = 'default';
   pos.x = clampX(pos.x);
@@ -1076,7 +1122,7 @@ window.addEventListener('mouseup', (e) => {
   }
   drag = null;
   const now = performance.now();
-  if (now - lastClick < 320) jump();
+  if (now - lastClick < 320) api.chat();
   else pet();
   lastClick = now;
   const o = hit(ux, uy);
@@ -1647,16 +1693,32 @@ function update(dt) {
       switch (state) {
         case 'walk': {
           phase += dt * 7.5;
-          pos.x += dir * 62 * dt;
+          if (aiTargetX != null) {
+            const dx = aiTargetX - pos.x;
+            if (Math.abs(dx) <= 4) {
+              pos.x = aiTargetX;
+              aiTargetX = null;
+              setState('idle');
+              refreshWA();
+              applyMove();
+              break;
+            }
+            dir = dx > 0 ? 1 : -1;
+            const sp = clamp(Math.abs(dx) * 2.2, 62, 190);
+            pos.x += dir * sp * dt;
+            if ((dir > 0 && pos.x > aiTargetX) || (dir < 0 && pos.x < aiTargetX)) pos.x = aiTargetX;
+          } else {
+            pos.x += dir * 62 * dt;
+          }
           const d = pickDisplay();
           const b = d.bounds;
           const fw = winDipW;
           if (dir > 0 && pos.x >= b.x + b.width - fw && !neighbor(d, 1)) {
             pos.x = b.x + b.width - fw;
-            dir = -1;
+            if (aiTargetX != null) { aiTargetX = null; setState('idle'); } else dir = -1;
           } else if (dir < 0 && pos.x <= b.x && !neighbor(d, -1)) {
             pos.x = b.x;
-            dir = 1;
+            if (aiTargetX != null) { aiTargetX = null; setState('idle'); } else dir = 1;
           }
           refreshWA();
           applyMove();
@@ -1854,20 +1916,34 @@ function update(dt) {
         winkT = 0.34;
       }
 
-      if (st > dur) chooseNext();
+      if (st > dur && aiTargetX == null) chooseNext();
     }
 
     squash = Math.max(0, squash - dt * 4.5);
   }
 
-  if (mouse.in && state !== 'sleep' && state !== 'walk') {
-    dir = mouse.x >= W / 2 ? 1 : -1;
+  // El ratón puede estar fuera de la ventana: el proceso principal nos manda
+  // su posición global para que los ojos lo sigan igualmente.
+  let lookX = null;
+  let lookY = null;
+  if (mouse.in) {
+    lookX = mouse.x;
+    lookY = mouse.y;
+  } else if (globalCursor) {
+    const f = (winDipW || W) / W;
+    const fh = (winDipH || H) / H;
+    lookX = (globalCursor.x - pos.x) / f;
+    lookY = (globalCursor.y - pos.y) / fh;
   }
 
-  const tz = mouse.in
-    ? clamp((mouse.x - W / 2) / 38, -1, 1) * 4 * (modelId === 'webillo' ? 1 : dir)
+  if (lookX != null && state !== 'sleep' && state !== 'walk') {
+    if (Math.abs(lookX - W / 2) > 25) dir = lookX >= W / 2 ? 1 : -1;
+  }
+
+  const tz = lookX != null
+    ? clamp((lookX - W / 2) / 38, -1, 1) * 4 * (modelId === 'webillo' ? 1 : dir)
     : 0;
-  const ty = mouse.in ? clamp((mouse.y - (GROUND + faceY())) / 55, -1, 1) * 3 : 0;
+  const ty = lookY != null ? clamp((lookY - (GROUND + faceY())) / 55, -1, 1) * 3 : 0;
   const k = Math.min(1, dt * 8);
   look.x += (tz - look.x) * k;
   look.y += (ty - look.y) * k;
@@ -3736,7 +3812,17 @@ function drawBubble(dt) {
   ctx.save();
   ctx.globalAlpha = a;
   ctx.font = '600 15px "Segoe UI", system-ui, sans-serif';
-  const tw = ctx.measureText(bubble.t).width;
+  // La burbuja es de una línea: recortamos con puntos suspensivos si la IA
+  // manda una frase más larga de lo que cabe.
+  let label = bubble.t;
+  let tw = ctx.measureText(label).width;
+  const maxText = W - 48;
+  while (tw > maxText && label.length > 4) {
+    label = label.slice(0, -2);
+    tw = ctx.measureText(label + '…').width;
+  }
+  if (label !== bubble.t) label += '…';
+  tw = ctx.measureText(label).width;
   const bw = Math.min(tw + 28, W - 20);
   const bh = 34;
   // Tumbada: la burbuja se centra sobre la cabeza de lado, no sobre el cuerpo.
@@ -3758,7 +3844,7 @@ function drawBubble(dt) {
   ctx.fillStyle = COL.dark;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(bubble.t, bx + bw / 2, by + bh / 2 + 1);
+  ctx.fillText(label, bx + bw / 2, by + bh / 2 + 1);
   ctx.restore();
 }
 
@@ -4728,6 +4814,18 @@ async function init() {
 init();
 
 api.onAction(doAction);
+
+api.onGlobalCursor((c) => { globalCursor = c; });
+
+api.onAI((c) => {
+  if (!c || !c.type) return;
+  switch (c.type) {
+    case 'say': say(String(c.text || '').slice(0, 120)); break;
+    case 'pose': doAction(c.name); break;
+    case 'move': aiGoTo(c.x, !!c.teleport); break;
+    case 'teleport': aiTeleport(c.x); break;
+  }
+});
 
 api.onDisplays((d) => {
   displays = d;

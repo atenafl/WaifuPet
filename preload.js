@@ -12,5 +12,9 @@ contextBridge.exposeInMainWorld('petAPI', {
   onAction: (cb) => ipcRenderer.on('pet-action', (_e, a) => cb(a)),
   onDisplays: (cb) => ipcRenderer.on('pet-displays', (_e, d) => cb(d)),
   dragState: (on) => ipcRenderer.send('pet-dragstate', !!on),
-  onCursor: (cb) => ipcRenderer.on('pet-cursor', (_e, c) => cb(c))
+  onCursor: (cb) => ipcRenderer.on('pet-cursor', (_e, c) => cb(c)),
+  onGlobalCursor: (cb) => ipcRenderer.on('pet-cursor-global', (_e, c) => cb(c)),
+  onAI: (cb) => ipcRenderer.on('pet-ai', (_e, c) => cb(c)),
+  chat: () => ipcRenderer.send('pet-chat'),
+  chatSettings: () => ipcRenderer.send('pet-chat-settings')
 });

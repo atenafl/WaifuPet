@@ -1,7 +1,11 @@
-const { app, BrowserWindow, ipcMain, screen, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Menu, Tray, globalShortcut, dialog, powerMonitor, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
+
+const aiConfig = require('./ai/config');
+const { ChatWindow, registerIpc } = require('./ai/chat-window');
+const { Agent } = require('./ai/agent');
 
 // Al arrancar con la tarea, Windows reenumera pantallas y Chromium decide
 // (mal) que la ventana está "oculta": deja de dibujarla aunque esté arriba del
@@ -10,6 +14,18 @@ const { execFile } = require('child_process');
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
+
+if (process.platform === 'win32') app.setAppUserModelId('com.atenafl.waifupet');
+
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (win && !win.isDestroyed()) win.showInactive();
+    openChat(false);
+  });
+}
 
 const W = 240;
 const H = 190;
@@ -22,6 +38,15 @@ let model = 'tigresa';
 let sizeId = 'normal';
 const SIZES = ['small', 'normal', 'big'];
 let disabled = new Set();
+
+// ---------- IA ----------
+let chat = null;
+let agent = null;
+let tray = null;
+let petHidden = false;
+let idleAsleep = false;
+let fullscreenHidden = false;
+let fullscreenBusy = false;
 
 function setModel(m) {
   if (m !== 'webillo' && m !== 'tigresa') return;
@@ -199,6 +224,255 @@ function send(action) {
   if (win && !win.isDestroyed()) win.webContents.send('pet-action', action);
 }
 
+// ---------- puente con la mascota ----------
+
+function sendAI(payload) {
+  if (win && !win.isDestroyed()) win.webContents.send('pet-ai', payload);
+}
+
+function petInfo() {
+  if (!win || win.isDestroyed()) return null;
+  const b = win.getBounds();
+  return {
+    width: b.width,
+    height: b.height,
+    bounds: b,
+    cursor: screen.getCursorScreenPoint(),
+    displays: displayList()
+  };
+}
+
+function openChat(settings) {
+  if (!chat) return;
+  chat.open(!!settings);
+}
+
+function togglePet() {
+  if (!win || win.isDestroyed()) return;
+  petHidden = !petHidden;
+  if (petHidden) win.hide();
+  else {
+    win.showInactive();
+    win.setAlwaysOnTop(true, 'screen-saver');
+  }
+  updateTrayMenu();
+}
+
+async function nativeConfirm(item) {
+  if (!win || win.isDestroyed()) return { allow: false };
+  const r = await dialog.showMessageBox(win, {
+    type: item.risk === 'high' ? 'warning' : 'question',
+    buttons: ['Permitir', 'Ahora no'],
+    defaultId: 1,
+    cancelId: 1,
+    noLink: true,
+    title: item.title || 'Permiso',
+    message: item.title || '¿Me dejas?',
+    detail: item.detail || ''
+  });
+  return { allow: r.response === 0 };
+}
+
+function initAI() {
+  chat = new ChatWindow({ petWin: win, onShown: () => updateTrayMenu() });
+  registerIpc(chat);
+
+  agent = new Agent({
+    chat: {
+      send: (ch, p) => chat.send(ch, p),
+      isOpen: () => chat.isOpen(),
+      ensureOpen: () => chat.open()
+    },
+    pet: { send: sendAI, info: petInfo, show: () => { if (petHidden && !fullscreenHidden) togglePet(); } },
+    askNative: nativeConfirm
+  });
+
+  // Recordatorios que quedaron pendientes de la sesión anterior.
+  agent.restoreReminders();
+  setInterval(() => { if (agent) agent.checkReminders(); }, 60000);
+
+  ipcMain.handle('ai:state', () => ({
+    config: aiConfig.publicConfig(),
+    history: agent.displayHistory(),
+    busy: agent.isBusy()
+  }));
+  ipcMain.handle('ai:send', (_e, text) => agent.send(text));
+  ipcMain.handle('ai:stop', () => { agent.stop(); return { ok: true }; });
+  ipcMain.handle('ai:confirm-reply', (_e, r) => {
+    if (!r) return { ok: false };
+    return { ok: agent.confirmReply(r.id, r.allow, r.always) };
+  });
+  ipcMain.handle('ai:save-config', (_e, patch) => {
+    aiConfig.save(patch || {});
+    registerShortcuts();
+    return aiConfig.publicConfig();
+  });
+  ipcMain.handle('ai:test', () => agent.testConnection());
+  ipcMain.handle('ai:clear', () => { agent.reset(); return { ok: true }; });
+
+  ipcMain.on('pet-chat', () => openChat(false));
+  ipcMain.on('pet-chat-settings', () => openChat(true));
+
+  createTray();
+  registerShortcuts();
+  startIdleWatch();
+  startCursorWatch();
+  setInterval(checkFullscreen, 8000);
+}
+
+// ---------- atajos ----------
+
+function bindShortcut(list, fn) {
+  for (const acc of list) {
+    try {
+      if (globalShortcut.register(acc, fn)) return acc;
+    } catch (e) { /* acelerador ocupado */ }
+  }
+  return null;
+}
+
+function registerShortcuts() {
+  try { globalShortcut.unregisterAll(); } catch (e) { /* nada registrado */ }
+  if (!aiConfig.load().shortcuts) return;
+  const a = bindShortcut(['CommandOrControl+Alt+Space', 'CommandOrControl+Alt+K'], () => openChat(false));
+  const b = bindShortcut(['CommandOrControl+Alt+T', 'CommandOrControl+Alt+Y'], () => {
+    openChat(false);
+    if (chat) chat.send('chat:start-mic', {});
+  });
+  const c = bindShortcut(['CommandOrControl+Alt+P', 'CommandOrControl+Alt+O'], () => sendAI({ type: 'teleport' }));
+  const d = bindShortcut(['CommandOrControl+Alt+H', 'CommandOrControl+Alt+J'], () => togglePet());
+  bindShortcut(['CommandOrControl+Alt+X'], () => { if (agent) agent.stop(); });
+  logdbg('shortcuts: chat=' + a + ' voz=' + b + ' teletransporte=' + c + ' ocultar=' + d);
+}
+
+// ---------- bandeja ----------
+
+function trayTemplate() {
+  return [
+    { label: 'Hablar con ella…', click: () => openChat(false) },
+    { label: 'Ajustes de IA…', click: () => openChat(true) },
+    { type: 'separator' },
+    {
+      label: petHidden ? 'Mostrar mascota' : 'Ocultar mascota',
+      click: () => togglePet()
+    },
+    {
+      label: 'Pausar',
+      type: 'checkbox',
+      checked: paused,
+      click: (item) => {
+        paused = item.checked;
+        send(paused ? 'pause-on' : 'pause-off');
+      }
+    },
+    {
+      label: 'Sonido',
+      type: 'checkbox',
+      checked: sound,
+      click: (item) => {
+        sound = item.checked;
+        send(sound ? 'sound-on' : 'sound-off');
+      }
+    },
+    { type: 'separator' },
+    { label: 'Salir', click: () => app.quit() }
+  ];
+}
+
+function updateTrayMenu() {
+  if (!tray || tray.isDestroyed()) return;
+  tray.setContextMenu(Menu.buildFromTemplate(trayTemplate()));
+}
+
+function createTray() {
+  try {
+    let img = nativeImage.createFromPath(path.join(__dirname, 'assets', 'webillo.png'));
+    if (img.isEmpty()) return;
+    img = img.resize({ width: 16, height: 16 });
+    tray = new Tray(img);
+    tray.setToolTip('Tigresa · WaifuPet');
+    updateTrayMenu();
+    tray.on('double-click', () => openChat(false));
+  } catch (e) {
+    logdbg('tray: ' + (e.message || e));
+  }
+}
+
+// ---------- reposo e inactividad ----------
+
+function startIdleWatch() {
+  setInterval(() => {
+    if (!win || win.isDestroyed() || !agent) return;
+    let idle = 0;
+    try { idle = powerMonitor.getSystemIdleTime(); } catch (e) { return; }
+    const limit = aiConfig.load().idleMinutes * 60;
+    if (!idleAsleep && idle >= limit) {
+      idleAsleep = true;
+      if (!agent.isBusy() && !petHidden) sendAI({ type: 'pose', name: 'sleep' });
+    } else if (idleAsleep && idle < Math.min(30, limit)) {
+      idleAsleep = false;
+      if (!agent.isBusy() && !petHidden) sendAI({ type: 'pose', name: 'wake' });
+    }
+  }, 15000);
+}
+
+// Seguimiento global del cursor para que los ojos miren al ratón aunque esté
+// fuera de la ventanita de la mascota.
+function startCursorWatch() {
+  setInterval(() => {
+    if (!win || win.isDestroyed() || !win.isVisible()) return;
+    if (win.isMinimized()) return;
+    win.webContents.send('pet-cursor-global', screen.getCursorScreenPoint());
+  }, 180);
+}
+
+function resourcePath(name) {
+  return app.isPackaged ? path.join(process.resourcesPath, name) : path.join(__dirname, name);
+}
+
+// Si una app está en pantalla completa (juego, vídeo), la mascota se aparta.
+function checkFullscreen() {
+  if (fullscreenBusy || !win || win.isDestroyed() || petHidden) return;
+  if (!aiConfig.load().hideFullscreen) {
+    if (fullscreenHidden) {
+      fullscreenHidden = false;
+      win.showInactive();
+      win.setAlwaysOnTop(true, 'screen-saver');
+    }
+    return;
+  }
+  fullscreenBusy = true;
+  execFile('powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', resourcePath('wins.ps1')],
+    { timeout: 8000, windowsHide: true }, (err, stdout) => {
+      fullscreenBusy = false;
+      if (err) return;
+      const nums = String(stdout).trim().split(',').map(Number);
+      if (nums.length !== 4 || nums.some((n) => !isFinite(n))) return;
+      const [l, t, r, b] = nums;
+      let full = false;
+      try {
+        // Solo importa la pantalla donde está la mascota: si el juego está en
+        // otro monitor, puede seguir acompañándote en el suyo.
+        const d = screen.getDisplayMatching(win.getBounds());
+        const pr = screen.dipToScreenRect(null, d.bounds);
+        full = l <= pr.x + 2 && t <= pr.y + 2 && r >= pr.x + pr.width - 2 && b >= pr.y + pr.height - 2;
+      } catch (e) { return; }
+      if (full && !fullscreenHidden) {
+        fullscreenHidden = true;
+        logdbg('fullscreen: ocultar mascota');
+        win.hide();
+      } else if (!full && fullscreenHidden) {
+        fullscreenHidden = false;
+        logdbg('fullscreen: mostrar mascota');
+        if (!petHidden) {
+          win.showInactive();
+          win.setAlwaysOnTop(true, 'screen-saver');
+        }
+      }
+    });
+}
+
 function createWindow() {
   const wa = screen.getPrimaryDisplay().workArea;
 
@@ -230,6 +504,9 @@ function createWindow() {
 
 function showMenu() {
   const template = [
+    { label: 'Hablar con ella…', click: () => openChat(false) },
+    { label: 'Ajustes de IA…', click: () => openChat(true) },
+    { type: 'separator' },
     {
       label: 'Hacer cosas',
       submenu: [
@@ -412,6 +689,7 @@ app.whenReady().then(() => {
   // el primer layout ya sale con el tamaño correcto aunque PowerShell falle.
   monList = loadSizesCache();
   createWindow();
+  initAI();
   screen.on('display-added', notifyDisplays);
   screen.on('display-removed', notifyDisplays);
   screen.on('display-metrics-changed', notifyDisplays);
@@ -426,3 +704,8 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => app.quit());
+
+app.on('will-quit', () => {
+  try { globalShortcut.unregisterAll(); } catch (e) { /* nada */ }
+  if (chat) chat.quit();
+});
